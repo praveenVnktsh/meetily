@@ -20,6 +20,7 @@ import { OnboardingProvider } from '@/contexts/OnboardingContext'
 import { OnboardingFlow } from '@/components/onboarding'
 import { loadBetaFeatures } from '@/types/betaFeatures'
 import { DownloadProgressToastProvider } from '@/components/shared/DownloadProgressToast'
+import { TranscriptionProgressToastProvider } from '@/components/shared/TranscriptionProgressToast'
 import { UpdateCheckProvider } from '@/components/UpdateCheckProvider'
 import { RecordingPostProcessingProvider } from '@/contexts/RecordingPostProcessingProvider'
 import { ImportAudioDialog, ImportDropOverlay } from '@/components/ImportAudio'
@@ -246,6 +247,8 @@ export default function RootLayout({
                             <ImportDialogProvider onOpen={handleOpenImportDialog}>
                               {/* Download progress toast provider - listens for background downloads */}
                               <DownloadProgressToastProvider />
+                              {/* Transcription progress toast provider - listens for import/retranscribe queue */}
+                              <TranscriptionProgressToastProvider />
 
                               {/* Show onboarding or main app */}
                               {showOnboarding ? (
@@ -277,6 +280,8 @@ export default function RootLayout({
         </AnalyticsProvider>
 
         <Toaster position="bottom-center" richColors closeButton />
+        {/* Separate Toaster for top-right progress toasts (download, transcription queue) */}
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   )

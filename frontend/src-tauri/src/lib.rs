@@ -598,6 +598,9 @@ pub fn run() {
             })
             .expect("Failed to initialize database");
 
+            // Initialize transcription queue worker (processes import/retranscribe tasks sequentially)
+            audio::transcription_queue::init_queue_worker(&_app.handle());
+
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
             if let Ok(resource_path) = _app.handle().path().resource_dir() {
@@ -845,6 +848,12 @@ pub fn run() {
             audio::import::start_import_audio_command,
             audio::import::cancel_import_command,
             audio::import::is_import_in_progress_command,
+            // Transcription queue commands
+            audio::transcription_queue::get_transcription_queue_status,
+            audio::transcription_queue::cancel_transcription_task,
+            audio::transcription_queue::pause_transcription_task,
+            audio::transcription_queue::resume_transcription_task,
+            audio::transcription_queue::is_transcription_queue_active,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

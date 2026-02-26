@@ -135,8 +135,11 @@ export function TranscriptPanel({
                   <Switch
                     checked={liveTranscriptEnabled}
                     onCheckedChange={handleLiveTranscriptToggle}
+                    disabled={isRecording}
                   />
-                  <span className="text-xs text-gray-500">Live transcription</span>
+                  <span className={`text-xs ${isRecording ? 'text-gray-300' : 'text-gray-500'}`}>
+                    Live transcription{isRecording ? ' (locked)' : ''}
+                  </span>
                 </div>
               )}
             </div>
@@ -158,10 +161,12 @@ export function TranscriptPanel({
 
       {/* Transcript content */}
       <div className="pb-20">
-        {isRecording && showLiveTranscriptToggle && !liveTranscriptEnabled ? (
+        {isRecording && (!showLiveTranscriptToggle || !liveTranscriptEnabled) ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-4">
-            <div className="h-4 w-4 rounded-full bg-blue-500 animate-pulse" />
-            <p className="text-sm text-gray-400">Recording... (live transcription off)</p>
+            <div className="h-8 w-8 rounded-full bg-red-500 animate-pulse" />
+            <p className="text-sm text-gray-400">
+              Recording{!liveTranscriptEnabled && showLiveTranscriptToggle ? ' (live transcription off)' : '...'}
+            </p>
           </div>
         ) : (
           <div className="flex justify-center">

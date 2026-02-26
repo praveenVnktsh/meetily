@@ -19,8 +19,8 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 /// Global flag to track if retranscription is in progress
 static RETRANSCRIPTION_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 
-/// Global flag to signal cancellation
-static RETRANSCRIPTION_CANCELLED: AtomicBool = AtomicBool::new(false);
+/// Global flag to signal cancellation (pub(crate) so transcription_queue can bridge to it)
+pub(crate) static RETRANSCRIPTION_CANCELLED: AtomicBool = AtomicBool::new(false);
 
 /// RAII guard for RETRANSCRIPTION_IN_PROGRESS flag
 /// Ensures flag is cleared even if retranscription panics or returns early
@@ -346,6 +346,11 @@ async fn run_retranscription<R: Runtime>(
             return Err(anyhow!("Retranscription cancelled"));
         }
 
+        // Wait if the queue task is paused (blocks until resumed or cancelled)
+        if !super::transcription_queue::check_pause().await {
+            return Err(anyhow!("Retranscription cancelled"));
+        }
+
         // Calculate progress (25% to 80% range for transcription)
         let progress = 25 + ((i as f32 / processable_count as f32) * 55.0) as u32;
         let segment_duration_sec = (segment.end_timestamp_ms - segment.start_timestamp_ms) / 1000.0;
@@ -497,6 +502,20 @@ async fn run_retranscription<R: Runtime>(
         duration_seconds,
         language,
     })
+}
+
+/// Public entry point for the transcription queue to run retranscription
+/// Unlike start_retranscription(), this does NOT use the RetranscriptionGuard (queue manages concurrency)
+/// and does NOT emit retranscription-complete/retranscription-error events (queue handles those)
+pub async fn run_retranscription_for_queue<R: Runtime>(
+    app: AppHandle<R>,
+    meeting_id: String,
+    meeting_folder_path: String,
+    language: Option<String>,
+    model: Option<String>,
+    provider: Option<String>,
+) -> Result<RetranscriptionResult> {
+    run_retranscription(app, meeting_id, meeting_folder_path, language, model, provider).await
 }
 
 /// Emit progress event
@@ -777,54 +796,44 @@ pub struct RetranscriptionStarted {
 }
 
 // Start retranscription (Beta gated using configContext.betaFeatures)
+// Now enqueues to the transcription queue instead of running directly
 #[tauri::command]
 pub async fn start_retranscription_command<R: Runtime>(
-    app: AppHandle<R>,
+    _app: AppHandle<R>,
     meeting_id: String,
     meeting_folder_path: String,
     language: Option<String>,
     model: Option<String>,
     provider: Option<String>,
 ) -> Result<RetranscriptionStarted, String> {
+    use super::transcription_queue::{get_queue, TranscriptionTask, TaskType, TaskStatus};
 
-    // Check if retranscription is already in progress (guard will be acquired in start_retranscription)
-    if RETRANSCRIPTION_IN_PROGRESS.load(Ordering::SeqCst) {
-        return Err("Retranscription already in progress".to_string());
-    }
+    // Use meeting_id as part of the title for display
+    let task = TranscriptionTask {
+        task_id: String::new(), // Will be assigned by queue
+        task_type: TaskType::Retranscribe,
+        title: format!("Retranscribe"),
+        status: TaskStatus::Pending,
+        source_path: None,
+        meeting_id: Some(meeting_id.clone()),
+        meeting_folder_path: Some(meeting_folder_path),
+        language,
+        model,
+        provider,
+    };
 
-    // Clone values for the spawned task
-    let meeting_id_clone = meeting_id.clone();
-
-    // Spawn the retranscription in a background task
-    tauri::async_runtime::spawn(async move {
-        let result = start_retranscription(
-            app,
-            meeting_id_clone,
-            meeting_folder_path,
-            language,
-            model,
-            provider,
-        )
-        .await;
-
-        // Errors are already emitted as events in start_retranscription
-        // so we just log here for debugging
-        if let Err(e) = result {
-            error!("Retranscription failed: {}", e);
-        }
-    });
+    let task_id = get_queue().enqueue(task).await;
+    info!("Retranscription enqueued as task: {}", task_id);
 
     Ok(RetranscriptionStarted {
         meeting_id,
-        message: "Retranscription started".to_string(),
+        message: format!("Retranscription queued (task: {})", task_id),
     })
 }
 
 #[tauri::command]
 pub async fn cancel_retranscription_command() -> Result<(), String> {
-    if !is_retranscription_in_progress() {
-        return Err("No retranscription in progress".to_string());
-    }
+    // Legacy cancel still works for direct retranscriptions
     cancel_retranscription();
     Ok(())
 }
