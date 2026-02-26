@@ -22,10 +22,16 @@ export interface BetaFeatures {
    * @since v0.3.0
    */
   importAndRetranscribe: boolean;
+  /**
+   * Toggle live transcription on/off during recording to save CPU/GPU resources
+   * @since v0.3.0
+   */
+  liveTranscription: boolean;
 }
 
 export const DEFAULT_BETA_FEATURES: BetaFeatures = {
   importAndRetranscribe: true, // Default: enabled
+  liveTranscription: false, // Default: disabled (user opts in via Settings > Beta)
 };
 
 
@@ -34,6 +40,7 @@ export const DEFAULT_BETA_FEATURES: BetaFeatures = {
  */
 export const BETA_FEATURE_NAMES: Record<keyof BetaFeatures, string> = {
   importAndRetranscribe: 'Import Audio & Retranscribe',
+  liveTranscription: 'Live Transcription Toggle',
 };
 
 /**
@@ -41,6 +48,7 @@ export const BETA_FEATURE_NAMES: Record<keyof BetaFeatures, string> = {
  */
 export const BETA_FEATURE_DESCRIPTIONS: Record<keyof BetaFeatures, string> = {
   importAndRetranscribe: 'Import audio files to transcribe or retranscribe existing meetings with different language settings.',
+  liveTranscription: 'Show a toggle to enable/disable live transcription during recording. When off, audio is still recorded but transcription is skipped to save resources.',
 };
 
 /**

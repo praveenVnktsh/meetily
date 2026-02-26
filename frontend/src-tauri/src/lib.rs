@@ -156,6 +156,9 @@ async fn start_recording<R: Runtime>(
         return Err("Recording already in progress".to_string());
     }
 
+    // Reset live transcription to enabled for each new recording
+    audio::pipeline::LIVE_TRANSCRIPTION_ENABLED.store(true, std::sync::atomic::Ordering::SeqCst);
+
     // Call the actual audio recording system with meeting name
     match audio::recording_commands::start_recording_with_devices_and_meeting(
         app.clone(),
@@ -370,6 +373,9 @@ async fn start_recording_with_devices_and_meeting<R: Runtime>(
     log_info!("🚀 CALLED start_recording_with_devices_and_meeting - Mic: {:?}, System: {:?}, Meeting: {:?}",
              mic_device_name, system_device_name, meeting_name);
 
+    // Reset live transcription to enabled for each new recording
+    audio::pipeline::LIVE_TRANSCRIPTION_ENABLED.store(true, std::sync::atomic::Ordering::SeqCst);
+
     // Clone meeting_name for notification use later
     let meeting_name_for_notification = meeting_name.clone();
 
@@ -427,6 +433,13 @@ async fn start_recording_with_devices_and_meeting<R: Runtime>(
             Err(e)
         }
     }
+}
+
+#[tauri::command]
+fn set_live_transcription_enabled(enabled: bool) -> Result<(), String> {
+    log_info!("Setting live transcription enabled: {}", enabled);
+    audio::pipeline::LIVE_TRANSCRIPTION_ENABLED.store(enabled, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
 }
 
 #[tauri::command]
@@ -774,6 +787,8 @@ pub fn run() {
             audio::recording_preferences::get_audio_backend_info,
             // Language preference commands
             set_language_preference,
+            // Live transcription toggle
+            set_live_transcription_enabled,
             // Notification system commands
             notifications::commands::get_notification_settings,
             notifications::commands::set_notification_settings,

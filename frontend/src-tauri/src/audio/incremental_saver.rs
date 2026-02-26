@@ -14,7 +14,7 @@ struct AudioData {
     // sample_rate: u32,
 }
 
-/// Incremental audio saver that writes checkpoints every 30 seconds
+/// Incremental audio saver that writes checkpoints every 10 seconds
 /// to minimize memory usage and enable crash recovery
 pub struct IncrementalAudioSaver {
     checkpoint_buffer: Vec<AudioData>,
@@ -41,7 +41,7 @@ impl IncrementalAudioSaver {
 
         Ok(Self {
             checkpoint_buffer: Vec::new(),
-            checkpoint_interval_samples: sample_rate as usize * 30, // 30 seconds
+            checkpoint_interval_samples: sample_rate as usize * 10, // 10 seconds
             checkpoint_count: 0,
             checkpoints_dir,
             meeting_folder,
@@ -65,7 +65,7 @@ impl IncrementalAudioSaver {
             .map(|c| c.data.len())
             .sum();
 
-        // Save checkpoint when buffer reaches threshold (30 seconds)
+        // Save checkpoint when buffer reaches threshold (10 seconds)
         if total_samples >= self.checkpoint_interval_samples {
             self.save_checkpoint()?;
             self.checkpoint_buffer.clear();
@@ -283,7 +283,7 @@ pub async fn recover_audio_from_checkpoints(
     checkpoint_files.sort_by_key(|entry| entry.path());
 
     let chunk_count = checkpoint_files.len() as u32;
-    let estimated_duration = (chunk_count as f64) * 30.0; // 30 seconds per chunk
+    let estimated_duration = (chunk_count as f64) * 10.0; // 10 seconds per chunk
 
     info!("Found {} checkpoint files, estimated duration: {:.2}s", chunk_count, estimated_duration);
 
@@ -432,7 +432,7 @@ mod tests {
             48000
         ).unwrap();
 
-        // Add 60 seconds worth of audio (should create 2 checkpoints)
+        // Add 60 seconds worth of audio (should create 6 checkpoints at 10s intervals)
         for i in 0..120 {  // 120 chunks of 0.5s each
             let chunk = AudioChunk {
                 data: vec![0.5f32; 24000],  // 0.5s at 48kHz
@@ -444,8 +444,8 @@ mod tests {
             saver.add_chunk(chunk).unwrap();
         }
 
-        // Verify 2 checkpoints created
-        assert_eq!(saver.checkpoint_count, 2);
+        // Verify 6 checkpoints created (60s / 10s interval)
+        assert_eq!(saver.checkpoint_count, 6);
 
         // Finalize and verify merge
         let final_path = saver.finalize().await.unwrap();

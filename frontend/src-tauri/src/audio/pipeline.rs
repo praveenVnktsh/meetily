@@ -1,4 +1,10 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Global flag to enable/disable live transcription during recording.
+/// When false, audio chunks are not sent to the transcription engine (saves CPU/GPU).
+/// Recording continues normally regardless of this flag.
+pub static LIVE_TRANSCRIPTION_ENABLED: AtomicBool = AtomicBool::new(true);
 use std::collections::VecDeque;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -857,36 +863,39 @@ impl AudioPipeline {
                             let mixed_with_gain = mixed_clean;
 
                             // STEP 3: Send mixed audio for transcription (VAD + Whisper)
-                            match self.vad_processor.process_audio(&mixed_with_gain) {
-                                Ok(speech_segments) => {
-                                    for segment in speech_segments {
-                                        let duration_ms = segment.end_timestamp_ms - segment.start_timestamp_ms;
+                            // Skip VAD processing entirely when live transcription is disabled (saves CPU/GPU)
+                            if LIVE_TRANSCRIPTION_ENABLED.load(Ordering::Relaxed) {
+                                match self.vad_processor.process_audio(&mixed_with_gain) {
+                                    Ok(speech_segments) => {
+                                        for segment in speech_segments {
+                                            let duration_ms = segment.end_timestamp_ms - segment.start_timestamp_ms;
 
-                                        if segment.samples.len() >= 800 {  // Minimum 50ms at 16kHz - matches Parakeet capability
-                                            info!("📤 Sending VAD segment: {:.1}ms, {} samples",
-                                                  duration_ms, segment.samples.len());
+                                            if segment.samples.len() >= 800 {  // Minimum 50ms at 16kHz - matches Parakeet capability
+                                                info!("📤 Sending VAD segment: {:.1}ms, {} samples",
+                                                      duration_ms, segment.samples.len());
 
-                                            let transcription_chunk = AudioChunk {
-                                                data: segment.samples,
-                                                sample_rate: 16000,
-                                                timestamp: segment.start_timestamp_ms / 1000.0,
-                                                chunk_id: self.chunk_id_counter,
-                                                device_type: DeviceType::Microphone,  // Mixed audio
-                                            };
+                                                let transcription_chunk = AudioChunk {
+                                                    data: segment.samples,
+                                                    sample_rate: 16000,
+                                                    timestamp: segment.start_timestamp_ms / 1000.0,
+                                                    chunk_id: self.chunk_id_counter,
+                                                    device_type: DeviceType::Microphone,  // Mixed audio
+                                                };
 
-                                            if let Err(e) = self.transcription_sender.send(transcription_chunk) {
-                                                warn!("Failed to send VAD segment: {}", e);
+                                                if let Err(e) = self.transcription_sender.send(transcription_chunk) {
+                                                    warn!("Failed to send VAD segment: {}", e);
+                                                } else {
+                                                    self.chunk_id_counter += 1;
+                                                }
                                             } else {
-                                                self.chunk_id_counter += 1;
+                                                debug!("⏭️ Dropping short VAD segment: {:.1}ms ({} samples < 800)",
+                                                       duration_ms, segment.samples.len());
                                             }
-                                        } else {
-                                            debug!("⏭️ Dropping short VAD segment: {:.1}ms ({} samples < 800)",
-                                                   duration_ms, segment.samples.len());
                                         }
                                     }
-                                }
-                                Err(e) => {
-                                    warn!("⚠️ VAD error: {}", e);
+                                    Err(e) => {
+                                        warn!("⚠️ VAD error: {}", e);
+                                    }
                                 }
                             }
 
@@ -924,6 +933,12 @@ impl AudioPipeline {
 
     fn flush_remaining_audio(&mut self) -> Result<()> {
         info!("Flushing remaining audio from pipeline (processed {} chunks)", self.processed_chunks);
+
+        // Skip VAD flush if live transcription is disabled (no segments buffered)
+        if !LIVE_TRANSCRIPTION_ENABLED.load(Ordering::Relaxed) {
+            info!("Live transcription disabled, skipping VAD flush");
+            return Ok(());
+        }
 
         // Flush any remaining audio from VAD processor and send segments to transcription
         match self.vad_processor.flush() {
