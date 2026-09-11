@@ -4,7 +4,7 @@
 
 use super::engine::TranscriptionEngine;
 use super::provider::TranscriptionError;
-use crate::audio::AudioChunk;
+use crate::audio::{AudioChunk, RecordingDeviceType};
 use log::{error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -27,6 +27,13 @@ pub fn reset_speech_detected_flag() {
 /// Filters empty/whitespace-only text; no confidence gating is applied.
 fn should_emit_transcript(text: &str) -> bool {
     !text.trim().is_empty()
+}
+
+fn source_label(device_type: &RecordingDeviceType) -> &'static str {
+    match device_type {
+        RecordingDeviceType::Microphone => "mic",
+        RecordingDeviceType::System => "system",
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -149,6 +156,7 @@ pub fn start_transcription_task<R: Runtime>(
 
                             let chunk_timestamp = chunk.timestamp;
                             let chunk_duration = chunk.data.len() as f64 / chunk.sample_rate as f64;
+                            let source = source_label(&chunk.device_type);
 
                             // Transcribe with provider-agnostic approach
                             match transcribe_chunk_with_provider(
@@ -206,7 +214,7 @@ pub fn start_transcription_task<R: Runtime>(
                                         let update = TranscriptUpdate {
                                             text: transcript,
                                             timestamp: format_current_timestamp(), // Wall-clock for reference
-                                            source: "Audio".to_string(),
+                                            source: source.to_string(),
                                             sequence_id,
                                             chunk_start_time: chunk_timestamp, // Legacy compatibility
                                             is_partial,
@@ -604,5 +612,11 @@ fn format_recording_time(seconds: f64) -> String {
         fn drops_empty_and_whitespace_only() {
             assert!(!should_emit_transcript(""));
             assert!(!should_emit_transcript("   "));
+        }
+
+        #[test]
+        fn labels_capture_sources_for_first_layer_diarization() {
+            assert_eq!(source_label(&RecordingDeviceType::Microphone), "mic");
+            assert_eq!(source_label(&RecordingDeviceType::System), "system");
         }
     }

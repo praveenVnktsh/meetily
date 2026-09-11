@@ -291,6 +291,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
             sequence_id: update.sequence_id,
             text: update.text.substring(0, 50) + '...',
             timestamp: update.timestamp,
+            speaker: update.source === 'mic' || update.source === 'system' ? update.source : undefined,
             is_partial: update.is_partial,
             received_at: new Date(now).toISOString(),
             buffer_size_before: transcriptBuffer.size
@@ -376,6 +377,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
             id: segment.id,
             text: segment.text,
             timestamp: segment.display_time, // Use display_time for UI
+            speaker: segment.speaker,
             sequence_id: segment.sequence_id,
             chunk_start_time: segment.audio_start_time,
             is_partial: false, // History segments are always final
@@ -410,6 +412,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
       sequence_id: update.sequence_id,
       text: update.text.substring(0, 50) + '...',
       timestamp: update.timestamp,
+      speaker: update.source === 'mic' || update.source === 'system' ? update.source : undefined,
       is_partial: update.is_partial
     });
 
@@ -465,7 +468,7 @@ export function TranscriptProvider({ children }: { children: ReactNode }) {
     };
 
     const fullTranscript = transcripts
-      .map(t => `${formatTime(t.audio_start_time)} ${t.text}`)
+      .map(t => `${formatTime(t.audio_start_time)}${t.speaker ? ` [${t.speaker === 'mic' ? 'You' : 'Others'}]` : ''} ${t.text}`)
       .join('\n');
     navigator.clipboard.writeText(fullTranscript);
 
