@@ -1,5 +1,6 @@
 use tauri::{
     Emitter,
+    image::Image,
     menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
     tray::TrayIconBuilder,
     AppHandle, Manager, Runtime,
@@ -21,10 +22,12 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // Pass can_record=true initially, will be updated by update_tray_menu immediately
     let menu = build_menu(app, RecordingState::Stopped, true)?;
 
+    let (icon, icon_as_template) = tray_icon(RecordingState::Stopped);
     TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
-        .title(tray_status(RecordingState::Stopped).0)
-        .tooltip(tray_status(RecordingState::Stopped).1)
+        .tooltip(tray_tooltip(RecordingState::Stopped))
+        .icon(icon)
+        .icon_as_template(icon_as_template)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .build(app)?;
 
@@ -315,24 +318,71 @@ pub async fn update_tray_menu_async<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn tray_status(state: RecordingState) -> (&'static str, &'static str) {
+fn tray_tooltip(state: RecordingState) -> &'static str {
     match state {
-        RecordingState::Stopped => ("M", "Meetily is active"),
-        RecordingState::Starting => ("…", "Meetily is starting a recording"),
-        RecordingState::Recording => ("🔴", "Meetily is recording"),
-        RecordingState::Pausing => ("…", "Meetily is pausing the recording"),
-        RecordingState::Paused => ("Ⅱ", "Meetily recording is paused"),
-        RecordingState::Resuming => ("…", "Meetily is resuming the recording"),
-        RecordingState::Stopping => ("…", "Meetily is finishing the recording"),
+        RecordingState::Stopped => "Meetily is active",
+        RecordingState::Starting => "Meetily is starting a recording",
+        RecordingState::Recording => "Meetily is recording",
+        RecordingState::Pausing => "Meetily is pausing the recording",
+        RecordingState::Paused => "Meetily recording is paused",
+        RecordingState::Resuming => "Meetily is resuming the recording",
+        RecordingState::Stopping => "Meetily is finishing the recording",
+    }
+}
+
+fn tray_icon(state: RecordingState) -> (Image<'static>, bool) {
+    const SIZE: u32 = 18;
+    let mut pixels = vec![0; (SIZE * SIZE * 4) as usize];
+    let mut set_pixel = |x: u32, y: u32, color: [u8; 4]| {
+        let offset = ((y * SIZE + x) * 4) as usize;
+        pixels[offset..offset + 4].copy_from_slice(&color);
+    };
+
+    match state {
+        RecordingState::Recording => {
+            for y in 0..SIZE {
+                for x in 0..SIZE {
+                    let dx = x as f32 - 8.5;
+                    let dy = y as f32 - 8.5;
+                    if dx * dx + dy * dy <= 42.25 {
+                        set_pixel(x, y, [235, 64, 52, 255]);
+                    }
+                }
+            }
+            (Image::new_owned(pixels, SIZE, SIZE), false)
+        }
+        RecordingState::Paused => {
+            for y in 3..15 {
+                for x in [5, 6, 11, 12] {
+                    set_pixel(x, y, [0, 0, 0, 255]);
+                }
+            }
+            (Image::new_owned(pixels, SIZE, SIZE), true)
+        }
+        _ => {
+            const M: [&str; 7] = ["10001", "11011", "10101", "10101", "10001", "10001", "10001"];
+            for (row, pattern) in M.iter().enumerate() {
+                for (column, value) in pattern.bytes().enumerate() {
+                    if value == b'1' {
+                        for dy in 0..2 {
+                            for dx in 0..2 {
+                                set_pixel(4 + column as u32 * 2 + dx, 2 + row as u32 * 2 + dy, [0, 0, 0, 255]);
+                            }
+                        }
+                    }
+                }
+            }
+            (Image::new_owned(pixels, SIZE, SIZE), true)
+        }
     }
 }
 
 fn update_tray_status<R: Runtime>(tray: &tauri::tray::TrayIcon<R>, state: RecordingState) {
-    let (title, tooltip) = tray_status(state);
-    if let Err(error) = tray.set_title(Some(title)) {
-        log::warn!("Tray: Failed to set status title: {}", error);
+    let (icon, icon_as_template) = tray_icon(state);
+    if let Err(error) = tray.set_icon_with_as_template(Some(icon), icon_as_template) {
+        log::warn!("Tray: Failed to set status icon: {}", error);
     }
-    if let Err(error) = tray.set_tooltip(Some(tooltip)) {
+    if let Err(error) = tray.set_tooltip(Some(tray_tooltip(state))) {
         log::warn!("Tray: Failed to set status tooltip: {}", error);
     }
 }
@@ -439,18 +489,19 @@ pub(crate) fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{tray_status, RecordingState};
+    use super::{tray_icon, tray_tooltip, RecordingState};
 
     #[test]
     fn tray_status_distinguishes_idle_recording_and_paused_states() {
-        assert_eq!(tray_status(RecordingState::Stopped), ("M", "Meetily is active"));
-        assert_eq!(
-            tray_status(RecordingState::Recording),
-            ("🔴", "Meetily is recording")
-        );
-        assert_eq!(
-            tray_status(RecordingState::Paused),
-            ("Ⅱ", "Meetily recording is paused")
-        );
+        assert_eq!(tray_tooltip(RecordingState::Stopped), "Meetily is active");
+        assert_eq!(tray_tooltip(RecordingState::Recording), "Meetily is recording");
+        assert_eq!(tray_tooltip(RecordingState::Paused), "Meetily recording is paused");
+
+        let (idle_icon, idle_is_template) = tray_icon(RecordingState::Stopped);
+        let (recording_icon, recording_is_template) = tray_icon(RecordingState::Recording);
+        assert!(idle_is_template);
+        assert!(!recording_is_template);
+        assert!(idle_icon.rgba().chunks_exact(4).any(|pixel| pixel[3] > 0));
+        assert!(recording_icon.rgba().chunks_exact(4).any(|pixel| pixel[0] == 235));
     }
 }
