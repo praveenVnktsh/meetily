@@ -131,6 +131,7 @@ impl MacOSSystemAudioDetector {
         self.background.start(|running, mut stop_rx| {
             Box::pin(async move {
                 let (tx, mut notify_rx) = tokio::sync::mpsc::channel(1);
+                let polling_callback = callback.clone();
 
                 std::thread::spawn(move || {
                     let callback = std::sync::Arc::new(std::sync::Mutex::new(callback));
@@ -333,14 +334,31 @@ impl MacOSSystemAudioDetector {
 
                 let _ = notify_rx.recv().await;
 
+                let mut last_apps = Vec::new();
+                let mut scan_interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
+
                 loop {
                     tokio::select! {
                         _ = &mut stop_rx => {
                             break;
                         }
-                        _ = tokio::time::sleep(tokio::time::Duration::from_millis(500)) => {
+                        _ = scan_interval.tick() => {
                             if !running.load(std::sync::atomic::Ordering::SeqCst) {
                                 break;
+                            }
+
+                            let mut apps = list_system_audio_using_apps();
+                            apps.sort_unstable();
+                            apps.dedup();
+
+                            if apps != last_apps {
+                                let event = if apps.is_empty() {
+                                    SystemAudioEvent::SystemAudioStopped
+                                } else {
+                                    SystemAudioEvent::SystemAudioStarted(apps.clone())
+                                };
+                                polling_callback(event);
+                                last_apps = apps;
                             }
                         }
                     }

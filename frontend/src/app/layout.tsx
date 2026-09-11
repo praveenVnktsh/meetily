@@ -26,6 +26,7 @@ import { RecordingPostProcessingProvider } from '@/contexts/RecordingPostProcess
 import { ImportAudioDialog, ImportDropOverlay } from '@/components/ImportAudio'
 import { ImportDialogProvider } from '@/contexts/ImportDialogContext'
 import { isAudioExtension, getAudioFormatsDisplayList } from '@/constants/audioFormats'
+import { MeetingDetectedPrompt } from '@/components/MeetingDetectedPrompt'
 
 
 const sourceSans3 = Source_Sans_3({
@@ -249,6 +250,7 @@ export default function RootLayout({
                               <DownloadProgressToastProvider />
                               {/* Transcription progress toast provider - listens for import/retranscribe queue */}
                               <TranscriptionProgressToastProvider />
+                              <MeetingDetectedPrompt enabled={onboardingCompleted && !showOnboarding} />
 
                               {/* Show onboarding or main app */}
                               {showOnboarding ? (

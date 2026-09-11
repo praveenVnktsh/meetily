@@ -39,6 +39,7 @@ export interface CustomOpenAIConfig {
 export interface RecordingPreferences {
   preferred_mic_device: string | null;
   preferred_system_device: string | null;
+  automatic_record_prompt: boolean;
 }
 
 /**

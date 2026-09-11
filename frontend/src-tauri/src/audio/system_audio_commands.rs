@@ -44,7 +44,7 @@ pub async fn start_system_audio_monitoring(
         .map_err(|e| format!("Failed to acquire detector lock: {}", e))?;
 
     if detector_guard.is_some() {
-        return Err("System audio monitoring is already active".to_string());
+        return Ok(());
     }
 
     let mut detector = SystemAudioDetector::new();

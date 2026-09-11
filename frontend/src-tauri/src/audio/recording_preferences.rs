@@ -16,6 +16,8 @@ pub struct RecordingPreferences {
     pub save_folder: PathBuf,
     pub auto_save: bool,
     pub file_format: String,
+    #[serde(default = "default_automatic_record_prompt")]
+    pub automatic_record_prompt: bool,
     #[serde(default)]
     pub preferred_mic_device: Option<String>,
     #[serde(default)]
@@ -31,12 +33,17 @@ impl Default for RecordingPreferences {
             save_folder: get_default_recordings_folder(),
             auto_save: true,
             file_format: "mp4".to_string(),
+            automatic_record_prompt: true,
             preferred_mic_device: None,
             preferred_system_device: None,
             #[cfg(target_os = "macos")]
             system_audio_backend: Some("coreaudio".to_string()),
         }
     }
+}
+
+fn default_automatic_record_prompt() -> bool {
+    true
 }
 
 /// Get the default recordings folder based on platform
@@ -384,4 +391,3 @@ pub async fn get_audio_backend_info() -> Result<Vec<BackendInfo>, String> {
         }])
     }
 }
-
