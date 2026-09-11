@@ -53,7 +53,7 @@ export function useRecordingStart(
 
   const { clearTranscripts, setMeetingTitle } = useTranscripts();
   const { setIsMeetingActive } = useSidebar();
-  const { selectedDevices } = useConfig();
+  const { selectedDevices, betaFeatures } = useConfig();
   const { setStatus } = useRecordingState();
 
   // Generate meeting title with timestamp
@@ -115,6 +115,13 @@ export function useRecordingStart(
   // The Rust recording command validates the same provider again before capture.
   const checkModelReady = checkTranscriptionModelReady;
 
+  const configureLiveTranscription = useCallback(async () => {
+    const enabled = !betaFeatures.liveTranscription
+      || localStorage.getItem('liveTranscriptEnabled') !== 'false';
+    await invoke('set_live_transcription_enabled', { enabled });
+    return enabled;
+  }, [betaFeatures.liveTranscription]);
+
   // Handle manual recording start (from button click)
   const handleRecordingStart = useCallback(async () => {
     if (isStartingRef.current) {
@@ -157,6 +164,7 @@ export function useRecordingStart(
 
       // Start the actual backend recording
       console.log('Starting backend recording with meeting:', randomTitle);
+      await configureLiveTranscription();
       await recordingService.startRecordingWithDevices(
         selectedDevices?.micDevice || null,
         selectedDevices?.systemDevice || null,
@@ -205,7 +213,7 @@ export function useRecordingStart(
     } finally {
       isStartingRef.current = false;
     }
-  }, [generateMeetingTitle, setMeetingTitle, setIsRecording, clearTranscripts, setIsMeetingActive, checkModelReady, checkIfModelDownloading, selectedDevices, showModal, setStatus]);
+  }, [generateMeetingTitle, setMeetingTitle, setIsRecording, clearTranscripts, setIsMeetingActive, checkModelReady, checkIfModelDownloading, configureLiveTranscription, selectedDevices, showModal, setStatus]);
 
   // Check for autoStartRecording flag and start recording automatically
   useEffect(() => {
@@ -249,6 +257,7 @@ export function useRecordingStart(
             setStatus(RecordingStatus.STARTING, 'Initializing recording...');
 
             console.log('Auto-starting backend recording with meeting:', generatedMeetingTitle);
+            await configureLiveTranscription();
             const result = await recordingService.startRecordingWithDevices(
               selectedDevices?.micDevice || null,
               selectedDevices?.systemDevice || null,
@@ -301,6 +310,7 @@ export function useRecordingStart(
     setIsMeetingActive,
     checkModelReady,
     checkIfModelDownloading,
+    configureLiveTranscription,
     showModal,
     setStatus,
   ]);
@@ -347,6 +357,7 @@ export function useRecordingStart(
         setStatus(RecordingStatus.STARTING, 'Initializing recording...');
 
         console.log('Starting backend recording with meeting:', generatedMeetingTitle);
+        await configureLiveTranscription();
         const result = await recordingService.startRecordingWithDevices(
           selectedDevices?.micDevice || null,
           selectedDevices?.systemDevice || null,
@@ -401,6 +412,7 @@ export function useRecordingStart(
     setIsMeetingActive,
     checkModelReady,
     checkIfModelDownloading,
+    configureLiveTranscription,
     showModal,
     setStatus,
   ]);

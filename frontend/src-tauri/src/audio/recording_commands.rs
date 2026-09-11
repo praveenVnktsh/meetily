@@ -427,17 +427,17 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
     finalize_recording_start();
     drop(engine_lifecycle_guard);
 
-    // Start optimized parallel transcription task and store handle
-    let task_handle = transcription::start_transcription_task(app.clone(), transcription_receiver);
-    {
+    let live_transcription_enabled =
+        super::pipeline::LIVE_TRANSCRIPTION_ENABLED.load(Ordering::SeqCst);
+    if live_transcription_enabled {
+        // Start optimized parallel transcription task and store handle
+        let task_handle =
+            transcription::start_transcription_task(app.clone(), transcription_receiver);
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();
         *global_task = Some(task_handle);
-    }
+        drop(global_task);
 
-    // CRITICAL: Listen for transcript-update events and save to recording manager
-    // This enables transcript history persistence for page reload sync
-    // Store listener ID for cleanup during stop_recording to ensure microphone is released
-    {
+        // Listen for transcript updates so live history survives page reloads.
         use tauri::Listener;
         let listener_id = app.listen("transcript-update", move |event: tauri::Event| {
             // Parse the transcript update from the event payload
@@ -465,6 +465,11 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
         let mut global_listener = TRANSCRIPT_LISTENER_ID.lock().unwrap();
         *global_listener = Some(listener_id);
         info!("✅ Transcript-update event listener registered for history persistence");
+    } else {
+        drop(transcription_receiver);
+        *TRANSCRIPTION_TASK.lock().unwrap() = None;
+        *TRANSCRIPT_LISTENER_ID.lock().unwrap() = None;
+        info!("⏺️ Deferred transcription mode active; recording audio without loading a live transcription engine");
     }
 
     // Emit success event
@@ -614,17 +619,17 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
     finalize_recording_start();
     drop(engine_lifecycle_guard);
 
-    // Start optimized parallel transcription task and store handle
-    let task_handle = transcription::start_transcription_task(app.clone(), transcription_receiver);
-    {
+    let live_transcription_enabled =
+        super::pipeline::LIVE_TRANSCRIPTION_ENABLED.load(Ordering::SeqCst);
+    if live_transcription_enabled {
+        // Start optimized parallel transcription task and store handle
+        let task_handle =
+            transcription::start_transcription_task(app.clone(), transcription_receiver);
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();
         *global_task = Some(task_handle);
-    }
+        drop(global_task);
 
-    // CRITICAL: Listen for transcript-update events and save to recording manager
-    // This enables transcript history persistence for page reload sync
-    // Store listener ID for cleanup during stop_recording to ensure microphone is released
-    {
+        // Listen for transcript updates so live history survives page reloads.
         use tauri::Listener;
         let listener_id = app.listen("transcript-update", move |event: tauri::Event| {
             // Parse the transcript update from the event payload
@@ -652,6 +657,11 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
         let mut global_listener = TRANSCRIPT_LISTENER_ID.lock().unwrap();
         *global_listener = Some(listener_id);
         info!("✅ Transcript-update event listener registered for history persistence");
+    } else {
+        drop(transcription_receiver);
+        *TRANSCRIPTION_TASK.lock().unwrap() = None;
+        *TRANSCRIPT_LISTENER_ID.lock().unwrap() = None;
+        info!("⏺️ Deferred transcription mode active; recording audio without loading a live transcription engine");
     }
 
     // Emit success event

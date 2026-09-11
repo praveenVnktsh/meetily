@@ -346,6 +346,9 @@ export function useTranscriptionProgressToast() {
 
         // Refresh sidebar
         refetchMeetings();
+        window.dispatchEvent(new CustomEvent('meetily:transcription-complete', {
+          detail: { meetingId: meeting_id },
+        }));
 
         // Clean up after toast auto-dismisses
         cleanupTask(task_id, 6000);

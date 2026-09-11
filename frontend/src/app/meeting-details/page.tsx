@@ -151,6 +151,20 @@ function MeetingDetailsContent() {
     }
   }, [transcriptError]);
 
+  useEffect(() => {
+    const handleDeferredTranscriptionComplete = (event: Event) => {
+      const completedMeetingId = (event as CustomEvent<{ meetingId: string }>).detail?.meetingId;
+      if (completedMeetingId === meetingId) {
+        void refetch();
+      }
+    };
+
+    window.addEventListener('meetily:transcription-complete', handleDeferredTranscriptionComplete);
+    return () => {
+      window.removeEventListener('meetily:transcription-complete', handleDeferredTranscriptionComplete);
+    };
+  }, [meetingId, refetch]);
+
   // Extract fetchMeetingDetails for use in child components (now refetches via hook)
   const fetchMeetingDetails = useCallback(async () => {
     if (!meetingId || meetingId === 'intro-call') {

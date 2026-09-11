@@ -31,7 +31,7 @@ export interface BetaFeatures {
 
 export const DEFAULT_BETA_FEATURES: BetaFeatures = {
   importAndRetranscribe: true, // Default: enabled
-  liveTranscription: false, // Default: disabled (user opts in via Settings > Beta)
+  liveTranscription: true, // Deferred transcription mode is available by default
 };
 
 
