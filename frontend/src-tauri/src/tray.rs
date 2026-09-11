@@ -5,7 +5,7 @@ use tauri::{
     AppHandle, Manager, Runtime,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingState {
     Stopped,
     Starting,
@@ -23,8 +23,8 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main-tray")
         .menu(&menu)
-        .tooltip("Meetily")
-        .icon(app.default_window_icon().unwrap().clone())
+        .title(tray_status(RecordingState::Stopped).0)
+        .tooltip(tray_status(RecordingState::Stopped).1)
         .on_menu_event(|app, event| handle_menu_event(app, event.id.as_ref()))
         .build(app)?;
 
@@ -226,6 +226,7 @@ pub fn set_tray_state<R: Runtime>(app: &AppHandle<R>, state: RecordingState) {
         if let Some(tray) = app.tray_by_id("main-tray") {
             let result = tray.set_menu(Some(menu));
             log::info!("Tray: Intermediate state menu update result: {:?}", result);
+            update_tray_status(&tray, state);
         } else {
             log::warn!("Tray: Could not find tray with id 'main-tray'");
         }
@@ -305,11 +306,34 @@ pub async fn update_tray_menu_async<R: Runtime>(app: &AppHandle<R>) {
         if let Some(tray) = app.tray_by_id("main-tray") {
             let result = tray.set_menu(Some(menu));
             log::info!("Tray: Menu update result: {:?}", result);
+            update_tray_status(&tray, recording_state);
         } else {
             log::warn!("Tray: Could not find tray with id 'main-tray'");
         }
     } else {
         log::error!("Tray: Failed to build menu");
+    }
+}
+
+fn tray_status(state: RecordingState) -> (&'static str, &'static str) {
+    match state {
+        RecordingState::Stopped => ("M", "Meetily is active"),
+        RecordingState::Starting => ("…", "Meetily is starting a recording"),
+        RecordingState::Recording => ("🔴", "Meetily is recording"),
+        RecordingState::Pausing => ("…", "Meetily is pausing the recording"),
+        RecordingState::Paused => ("Ⅱ", "Meetily recording is paused"),
+        RecordingState::Resuming => ("…", "Meetily is resuming the recording"),
+        RecordingState::Stopping => ("…", "Meetily is finishing the recording"),
+    }
+}
+
+fn update_tray_status<R: Runtime>(tray: &tauri::tray::TrayIcon<R>, state: RecordingState) {
+    let (title, tooltip) = tray_status(state);
+    if let Err(error) = tray.set_title(Some(title)) {
+        log::warn!("Tray: Failed to set status title: {}", error);
+    }
+    if let Err(error) = tray.set_tooltip(Some(tooltip)) {
+        log::warn!("Tray: Failed to set status tooltip: {}", error);
     }
 }
 
@@ -410,5 +434,23 @@ pub(crate) fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
         }
     } else {
         log::warn!("Could not find main window");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{tray_status, RecordingState};
+
+    #[test]
+    fn tray_status_distinguishes_idle_recording_and_paused_states() {
+        assert_eq!(tray_status(RecordingState::Stopped), ("M", "Meetily is active"));
+        assert_eq!(
+            tray_status(RecordingState::Recording),
+            ("🔴", "Meetily is recording")
+        );
+        assert_eq!(
+            tray_status(RecordingState::Paused),
+            ("Ⅱ", "Meetily recording is paused")
+        );
     }
 }
