@@ -105,7 +105,9 @@ jobs:
       platform: ${{ matrix.platform }}
       target: ${{ matrix.target }}
       build-args: ${{ matrix.args }}
-      sign-binaries: true
+      # Updater artifacts are signed separately with TAURI_SIGNING_PRIVATE_KEY.
+      # Native Apple/Windows signing remains off until this fork owns certificates.
+      sign-binaries: false
       asset-prefix: "meetily"
       upload-artifacts: false  # tauri-action uploads directly to release
       release-id: ${{ needs.create-release.outputs.release-id }}

@@ -13,6 +13,10 @@ import {
   type ModelWithStatus,
 } from '@/lib/transcription-model-readiness';
 import { toast } from 'sonner';
+import {
+  isLiveTranscriptionEnabled,
+  LIVE_TRANSCRIPTION_STORAGE_KEY,
+} from '@/lib/liveTranscription';
 
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE = 'TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED';
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE = 'Speech recognition could not initialize. Restart Meetily. If the problem continues, repair or reinstall the app.';
@@ -116,8 +120,10 @@ export function useRecordingStart(
   const checkModelReady = checkTranscriptionModelReady;
 
   const configureLiveTranscription = useCallback(async () => {
-    const enabled = !betaFeatures.liveTranscription
-      || localStorage.getItem('liveTranscriptEnabled') !== 'false';
+    const enabled = isLiveTranscriptionEnabled(
+      localStorage.getItem(LIVE_TRANSCRIPTION_STORAGE_KEY),
+      betaFeatures.liveTranscription,
+    );
     await invoke('set_live_transcription_enabled', { enabled });
     return enabled;
   }, [betaFeatures.liveTranscription]);
