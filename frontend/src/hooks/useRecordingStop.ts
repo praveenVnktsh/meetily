@@ -14,6 +14,7 @@ import {
   applyPinnedSummaryLanguageToMeeting,
   detectAndCacheSummaryLanguage,
 } from '@/lib/summary-language-preferences';
+import { markDeferredMeetingForAutoSummary } from '@/lib/autoSummary';
 
 type SummaryStatus = 'idle' | 'processing' | 'summarizing' | 'regenerating' | 'completed' | 'error';
 
@@ -284,6 +285,7 @@ export function useRecordingStop(
               model: transcriptModelConfig.model || null,
               provider: transcriptModelConfig.provider || null,
             });
+            markDeferredMeetingForAutoSummary(meetingId);
           }
 
           let shouldDetectSummaryLanguage = false;
@@ -313,6 +315,12 @@ export function useRecordingStop(
           console.log('✅ Successfully saved COMPLETE meeting with ID:', meetingId);
           console.log('   Transcripts:', freshTranscripts.length);
           console.log('   folder_path:', folderPath);
+
+          if (!shouldDeferTranscription) {
+            window.dispatchEvent(new CustomEvent('meetily:meeting-ready-for-summary', {
+              detail: { meetingId },
+            }));
+          }
 
           // Mark meeting as saved in IndexedDB (for recovery system)
           await markMeetingAsSaved();

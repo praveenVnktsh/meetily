@@ -27,6 +27,7 @@ import { ImportAudioDialog, ImportDropOverlay } from '@/components/ImportAudio'
 import { ImportDialogProvider } from '@/contexts/ImportDialogContext'
 import { isAudioExtension, getAudioFormatsDisplayList } from '@/constants/audioFormats'
 import { MeetingDetectedPrompt } from '@/components/MeetingDetectedPrompt'
+import { AutoSummaryProvider } from '@/components/AutoSummaryProvider'
 
 
 const sourceSans3 = Source_Sans_3({
@@ -250,6 +251,7 @@ export default function RootLayout({
                               <DownloadProgressToastProvider />
                               {/* Transcription progress toast provider - listens for import/retranscribe queue */}
                               <TranscriptionProgressToastProvider />
+                              <AutoSummaryProvider />
                               <MeetingDetectedPrompt enabled={onboardingCompleted && !showOnboarding} />
 
                               {/* Show onboarding or main app */}

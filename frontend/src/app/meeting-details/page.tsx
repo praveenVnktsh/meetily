@@ -165,6 +165,18 @@ function MeetingDetailsContent() {
     };
   }, [meetingId, refetch]);
 
+  useEffect(() => {
+    const handleAutoSummaryRequested = (event: Event) => {
+      const requestedMeetingId = (event as CustomEvent<{ meetingId: string }>).detail?.meetingId;
+      if (requestedMeetingId === meetingId) {
+        setHasCheckedAutoGen(true);
+      }
+    };
+
+    window.addEventListener('meetily:auto-summary-requested', handleAutoSummaryRequested);
+    return () => window.removeEventListener('meetily:auto-summary-requested', handleAutoSummaryRequested);
+  }, [meetingId]);
+
   // Extract fetchMeetingDetails for use in child components (now refetches via hook)
   const fetchMeetingDetails = useCallback(async () => {
     if (!meetingId || meetingId === 'intro-call') {
