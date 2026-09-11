@@ -305,6 +305,15 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                 </TooltipContent>
               </Tooltip>
               <div className="flex-1">
+                {transcript.speaker && (
+                  <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                    transcript.speaker === 'mic'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'bg-violet-50 text-violet-700'
+                  }`}>
+                    {transcript.speaker === 'mic' ? 'You' : 'Others'}
+                  </span>
+                )}
                 {isStreaming ? (
                   // Streaming transcript - show in bubble (full width)
                   <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
