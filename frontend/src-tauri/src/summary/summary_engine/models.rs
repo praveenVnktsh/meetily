@@ -223,12 +223,9 @@ pub fn get_model_by_name(name: &str) -> Option<ModelDef> {
     get_available_models().into_iter().find(|m| m.name == name)
 }
 
-/// Get the default model (first in list)
+/// Get the largest, highest-quality built-in summary model.
 pub fn get_default_model() -> ModelDef {
-    get_available_models()
-        .into_iter()
-        .next()
-        .expect("At least one model must be defined")
+    get_model_by_name("qwen3.5:4b").expect("Default summary model must be defined")
 }
 
 /// Resolve model name to full file path in the models directory
@@ -330,6 +327,11 @@ pub const GENERATION_TIMEOUT_SECS: u64 = 900; // 15 minutes
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn default_model_is_largest_qwen_model() {
+        assert_eq!(get_default_model().name, "qwen3.5:4b");
+    }
 
     #[test]
     fn qwen35_models_are_registered_with_expected_metadata() {
