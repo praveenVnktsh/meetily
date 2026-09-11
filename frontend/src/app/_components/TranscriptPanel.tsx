@@ -13,6 +13,10 @@ import { useIsLinux } from '@/hooks/usePlatform';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import {
+  isLiveTranscriptionEnabled,
+  LIVE_TRANSCRIPTION_STORAGE_KEY,
+} from '@/lib/liveTranscription';
 
 /**
  * TranscriptPanel Component
@@ -42,9 +46,8 @@ export function TranscriptPanel({
 
   // Live transcription toggle state (only visible when beta feature is enabled)
   const [liveTranscriptEnabled, setLiveTranscriptEnabled] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('liveTranscriptEnabled');
-    return saved !== null ? saved === 'true' : true;
+    if (typeof window === 'undefined') return false;
+    return isLiveTranscriptionEnabled(localStorage.getItem(LIVE_TRANSCRIPTION_STORAGE_KEY));
   });
 
   const handleLiveTranscriptToggle = useCallback(async (enabled: boolean) => {
@@ -66,7 +69,7 @@ export function TranscriptPanel({
     }
 
     setLiveTranscriptEnabled(enabled);
-    localStorage.setItem('liveTranscriptEnabled', String(enabled));
+    localStorage.setItem(LIVE_TRANSCRIPTION_STORAGE_KEY, String(enabled));
     invoke('set_live_transcription_enabled', { enabled }).catch((err) =>
       console.error('[TranscriptPanel] Failed to set live transcription:', err)
     );

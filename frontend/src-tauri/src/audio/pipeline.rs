@@ -22,7 +22,7 @@ use super::vad::{ContinuousVadProcessor};
 /// How long a silence must last before the VAD closes a speech segment, and
 /// therefore how long the audio clips handed to the ASR engine are.
 ///
-/// Live-path policy: 500ms (matches the established Meetily Pro live policy).
+/// Live-path policy: 500ms for responsive incremental transcription.
 /// The batch paths (`import.rs` / `retranscription.rs`) use 2000ms instead —
 /// they have no latency requirement, so they optimize purely for ASR request
 /// length. The live path cannot: with continuous audio (e.g. a podcast played
