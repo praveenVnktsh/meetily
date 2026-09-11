@@ -9,6 +9,7 @@ describe('detectMeetingApp', () => {
     });
     expect(detectMeetingApp(['Microsoft Teams (work or school)'])?.name).toBe('Microsoft Teams');
     expect(detectMeetingApp(['Slack'])?.name).toBe('Slack Huddle');
+    expect(detectMeetingApp(['Google Chrome', 'Google Meet'])?.name).toBe('Google Meet');
   });
 
   test('ignores browsers and unrelated audio applications', () => {

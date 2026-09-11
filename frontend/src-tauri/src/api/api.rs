@@ -130,6 +130,8 @@ pub struct MeetingTranscript {
     pub id: String,
     pub text: String,
     pub timestamp: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
     // Recording-relative timestamps for audio-transcript synchronization
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_start_time: Option<f64>,
@@ -181,6 +183,8 @@ pub struct TranscriptSegment {
     pub id: String,
     pub text: String,
     pub timestamp: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speaker: Option<String>,
     // NEW: Recording-relative timestamps for playback synchronization
     #[serde(skip_serializing_if = "Option::is_none")]
     pub audio_start_time: Option<f64>,
@@ -875,6 +879,7 @@ pub async fn api_get_meeting_transcripts<R: Runtime>(
                     id: t.id,
                     text: t.transcript,
                     timestamp: t.timestamp,
+                    speaker: t.speaker,
                     audio_start_time: t.audio_start_time,
                     audio_end_time: t.audio_end_time,
                     duration: t.duration,

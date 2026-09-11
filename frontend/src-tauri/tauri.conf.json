@@ -19,6 +19,21 @@
                 "fullscreen": false,
                 "theme": "Light",
                 "decorations": true
+            },
+            {
+                "label": "meeting-prompt",
+                "title": "Meeting detected",
+                "url": "/meeting-prompt",
+                "width": 380,
+                "height": 196,
+                "resizable": false,
+                "fullscreen": false,
+                "decorations": false,
+                "transparent": true,
+                "alwaysOnTop": true,
+                "skipTaskbar": true,
+                "visible": false,
+                "shadow": true
             }
         ],
         "macOSPrivateApi": true,
@@ -40,7 +55,8 @@
                     "identifier": "main",
                     "description": "Main window capability with file system and media access",
                     "windows": [
-                        "main"
+                        "main",
+                        "meeting-prompt"
                     ],
                     "permissions": [
                         "fs:default",
@@ -60,6 +76,10 @@
                         "core:menu:default",
                         "core:tray:default",
                         "core:window:allow-set-title",
+                        "core:window:allow-set-position",
+                        "core:window:allow-show",
+                        "core:window:allow-hide",
+                        "core:window:allow-set-focus",
                         "store:default",
                         "notification:default",
                         "notification:allow-is-permission-granted",
@@ -112,9 +132,9 @@
     },
     "plugins": {
         "updater": {
-            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVDQTYzMUQ3ODc5N0M4MkEKUldRcXlKZUgxekdtN09DRkVWSHNpZlJseEVOUmpNd1dDSTNaLzZ3MXJGTnY3WW1pdnlOYjBpbkIK",
+            "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVFMTcxMjYwM0FERjZCODQKUldTRWE5ODZZQklYN3UzZ0FUQWxsU1NZUDRvWlZhWU5aU0c3V0VvQ0F6SXRTd1dhN3hYTHFuQmYK",
             "endpoints": [
-                "https://github.com/Zackriya-Solutions/meeting-minutes/releases/latest/download/latest.json"
+                "https://github.com/praveenVnktsh/meetily/releases/latest/download/latest.json"
             ]
         }
     }

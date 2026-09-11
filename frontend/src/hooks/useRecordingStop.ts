@@ -14,6 +14,11 @@ import {
   applyPinnedSummaryLanguageToMeeting,
   detectAndCacheSummaryLanguage,
 } from '@/lib/summary-language-preferences';
+import { markDeferredMeetingForAutoSummary } from '@/lib/autoSummary';
+import {
+  LIVE_TRANSCRIPTION_STORAGE_KEY,
+  shouldDeferTranscription,
+} from '@/lib/liveTranscription';
 
 type SummaryStatus = 'idle' | 'processing' | 'summarizing' | 'regenerating' | 'completed' | 'error';
 
@@ -137,8 +142,10 @@ export function useRecordingStop(
     setIsRecording(false);
     setIsRecordingDisabled(true);
     const stopStartTime = Date.now();
-    const shouldDeferTranscription = betaFeatures.liveTranscription
-      && localStorage.getItem('liveTranscriptEnabled') === 'false';
+    const deferTranscription = shouldDeferTranscription(
+      localStorage.getItem(LIVE_TRANSCRIPTION_STORAGE_KEY),
+      betaFeatures.liveTranscription,
+    );
 
     try {
       console.log('Post-stop processing (new implementation)...', {
@@ -157,7 +164,7 @@ export function useRecordingStop(
       const MAX_WAIT_TIME = 60000; // 60 seconds maximum wait (increased for longer processing)
       const POLL_INTERVAL = 500; // Check every 500ms
       let elapsedTime = 0;
-      let transcriptionComplete = shouldDeferTranscription;
+      let transcriptionComplete = deferTranscription;
 
       // Listen for transcription-complete event
       const unlistenComplete = await listen('transcription-complete', () => {
@@ -206,7 +213,7 @@ export function useRecordingStop(
 
       if (!transcriptionComplete && elapsedTime >= MAX_WAIT_TIME) {
         console.warn('⏰ Transcription wait timeout reached after', elapsedTime, 'ms');
-      } else if (!shouldDeferTranscription) {
+      } else if (!deferTranscription) {
         console.log('✅ Transcription completed after', elapsedTime, 'ms');
         // Wait longer for any late transcript segments (increased from 1s to 4s)
         console.log('⏳ Waiting for late transcript segments...');
@@ -271,7 +278,7 @@ export function useRecordingStop(
             throw new Error('No meeting ID received from save operation');
           }
 
-          if (shouldDeferTranscription) {
+          if (deferTranscription) {
             if (!folderPath) {
               throw new Error('Recording was saved without an audio folder, so deferred transcription could not start.');
             }
@@ -285,6 +292,7 @@ export function useRecordingStop(
               model: transcriptModelConfig.model || null,
               provider: transcriptModelConfig.provider || null,
             });
+            markDeferredMeetingForAutoSummary(meetingId);
           }
 
           let shouldDetectSummaryLanguage = false;
@@ -297,7 +305,7 @@ export function useRecordingStop(
             });
           }
 
-          if (shouldDetectSummaryLanguage && !shouldDeferTranscription) {
+          if (shouldDetectSummaryLanguage && !deferTranscription) {
             try {
               await detectAndCacheSummaryLanguage(
                 meetingId,
@@ -314,6 +322,12 @@ export function useRecordingStop(
           console.log('✅ Successfully saved COMPLETE meeting with ID:', meetingId);
           console.log('   Transcripts:', freshTranscripts.length);
           console.log('   folder_path:', folderPath);
+
+          if (!deferTranscription) {
+            window.dispatchEvent(new CustomEvent('meetily:meeting-ready-for-summary', {
+              detail: { meetingId },
+            }));
+          }
 
           // Mark meeting as saved in IndexedDB (for recovery system)
           await markMeetingAsSaved();
@@ -345,8 +359,8 @@ export function useRecordingStop(
           setStatus(RecordingStatus.COMPLETED);
 
           // Show success toast with navigation option
-          toast.success(shouldDeferTranscription ? 'Recording saved — transcription queued' : 'Recording saved successfully!', {
-            description: shouldDeferTranscription
+          toast.success(deferTranscription ? 'Recording saved — transcription queued' : 'Recording saved successfully!', {
+            description: deferTranscription
               ? 'The transcript will appear when background processing finishes.'
               : `${freshTranscripts.length} transcript segments saved.`,
             action: {

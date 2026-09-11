@@ -273,14 +273,14 @@ if (-not (Test-Path "whisper-server-package\whisper-server.exe")) {
         # Add User-Agent header to avoid API rate limiting
         $headers["User-Agent"] = "PowerShell-Script"
         
-        $apiUrl = "https://api.github.com/repos/Zackriya-Solutions/meeting-minutes/releases/latest"
+        $apiUrl = "https://api.github.com/repos/praveenVnktsh/meetily/releases/latest"
         $releaseInfo = Invoke-RestMethod -Uri $apiUrl -Headers $headers -UseBasicParsing
         
         $tagName = $releaseInfo.tag_name
         Write-Host "Latest release tag: $tagName"
         
         # Construct the download URL with the actual tag
-        $downloadUrl = "https://github.com/Zackriya-Solutions/meeting-minutes/releases/download/$tagName/whisper-server.exe"
+        $downloadUrl = "https://github.com/praveenVnktsh/meetily/releases/download/$tagName/whisper-server.exe"
         $destinationPath = "whisper-server-package\whisper-server.exe"
         
         # Download the file
@@ -299,14 +299,14 @@ if (-not (Test-Path "whisper-server-package\whisper-server.exe")) {
         # Try alternative method - look for any recent release
         Write-Host "Attempting alternative download method..."
         try {
-            $allReleasesUrl = "https://api.github.com/repos/Zackriya-Solutions/meeting-minutes/releases"
+            $allReleasesUrl = "https://api.github.com/repos/praveenVnktsh/meetily/releases"
             $headers = @{"User-Agent" = "PowerShell-Script"}
             $releases = Invoke-RestMethod -Uri $allReleasesUrl -Headers $headers -UseBasicParsing
             
             if ($releases.Count -gt 0) {
                 $latestTag = $releases[0].tag_name
                 Write-Host "Found release: $latestTag"
-                $altDownloadUrl = "https://github.com/Zackriya-Solutions/meeting-minutes/releases/download/$latestTag/whisper-server.exe"
+                $altDownloadUrl = "https://github.com/praveenVnktsh/meetily/releases/download/$latestTag/whisper-server.exe"
                 
                 Write-Host "Downloading from: $altDownloadUrl"
                 Invoke-WebRequest -Uri $altDownloadUrl -OutFile "whisper-server-package\whisper-server.exe" -UseBasicParsing
@@ -318,7 +318,7 @@ if (-not (Test-Path "whisper-server-package\whisper-server.exe")) {
         } catch {
             Write-Host "Alternative method also failed."
             Write-Host "Please download whisper-server.exe manually from:"
-            Write-Host "https://github.com/Zackriya-Solutions/meeting-minutes/releases"
+            Write-Host "https://github.com/praveenVnktsh/meetily/releases"
             Write-Host "And place it in: whisper-server-package\whisper-server.exe"
             exit 1
         }
@@ -776,7 +776,7 @@ if ($frontendInstalled) {
         try {
             # Fetch the latest release information
             $headers = @{"User-Agent" = "PowerShell-Script"}
-            $apiUrl = "https://api.github.com/repos/Zackriya-Solutions/meeting-minutes/releases/latest"
+            $apiUrl = "https://api.github.com/repos/praveenVnktsh/meetily/releases/latest"
             $releaseInfo = Invoke-RestMethod -Uri $apiUrl -Headers $headers -UseBasicParsing
             
             # Find the setup.exe asset - looking for files ending with _x64-setup.exe or similar
@@ -851,7 +851,7 @@ if ($frontendInstalled) {
                 }
                 Write-Host ""
                 Write-Host "Please download the installer manually from:"
-                Write-Host "https://github.com/Zackriya-Solutions/meeting-minutes/releases"
+                Write-Host "https://github.com/praveenVnktsh/meetily/releases"
             }
             
         } catch {
@@ -860,7 +860,7 @@ if ($frontendInstalled) {
             # Try alternative method - look for any recent release
             try {
                 Write-Host "Attempting alternative download method..."
-                $allReleasesUrl = "https://api.github.com/repos/Zackriya-Solutions/meeting-minutes/releases"
+                $allReleasesUrl = "https://api.github.com/repos/praveenVnktsh/meetily/releases"
                 $releases = Invoke-RestMethod -Uri $allReleasesUrl -Headers @{"User-Agent" = "PowerShell-Script"} -UseBasicParsing
                 
                 if ($releases.Count -gt 0) {
@@ -906,13 +906,13 @@ if ($frontendInstalled) {
                     if (-not $setupAsset) {
                         Write-Host "No installer found in any recent releases."
                         Write-Host "Please download the frontend installer manually from:"
-                        Write-Host "https://github.com/Zackriya-Solutions/meeting-minutes/releases"
+                        Write-Host "https://github.com/praveenVnktsh/meetily/releases"
                     }
                 }
             } catch {
                 Write-Host "Alternative method also failed."
                 Write-Host "Please download the frontend installer manually from:"
-                Write-Host "https://github.com/Zackriya-Solutions/meeting-minutes/releases"
+                Write-Host "https://github.com/praveenVnktsh/meetily/releases"
             }
         }
     }

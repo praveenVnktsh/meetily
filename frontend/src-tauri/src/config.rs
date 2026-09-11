@@ -4,8 +4,8 @@
 /// Used across database initialization, import, and retranscription.
 
 /// Default Whisper model for transcription when no preference is configured.
-/// This is the recommended balance of accuracy and speed.
-pub const DEFAULT_WHISPER_MODEL: &str = "large-v3-turbo";
+/// This is the largest, highest-accuracy registered Whisper model.
+pub const DEFAULT_WHISPER_MODEL: &str = "large-v3";
 
 /// Default Parakeet model for transcription when no preference is configured.
 /// This is the quantized version optimized for speed.

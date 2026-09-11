@@ -4,6 +4,7 @@ export interface DetectedMeetingApp {
 }
 
 const MEETING_APP_PATTERNS: Array<{ name: string; patterns: RegExp[] }> = [
+  { name: 'Google Meet', patterns: [/^google meet$/i] },
   { name: 'Zoom', patterns: [/\bzoom(?:\.us| workplace)?\b/i] },
   { name: 'Microsoft Teams', patterns: [/\bmicrosoft teams\b/i, /^teams$/i] },
   { name: 'Cisco Webex', patterns: [/\bwebex\b/i] },
