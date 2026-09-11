@@ -152,6 +152,8 @@ function MeetingDetailsContent() {
   }, [transcriptError]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleDeferredTranscriptionComplete = (event: Event) => {
       const completedMeetingId = (event as CustomEvent<{ meetingId: string }>).detail?.meetingId;
       if (completedMeetingId === meetingId) {
@@ -166,6 +168,8 @@ function MeetingDetailsContent() {
   }, [meetingId, refetch]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+
     const handleAutoSummaryRequested = (event: Event) => {
       const requestedMeetingId = (event as CustomEvent<{ meetingId: string }>).detail?.meetingId;
       if (requestedMeetingId === meetingId) {

@@ -21,10 +21,10 @@ cp "$REPO_DIR/target/release/llama-helper" "$SIDECAR_DIR/llama-helper-$TARGET_TR
 
 echo "Building the local Meetily app..."
 cd "$FRONTEND_DIR"
-pnpm exec tauri build \
+bunx tauri build \
   --bundles app \
   --no-sign \
-  --config '{"bundle":{"createUpdaterArtifacts":false}}' \
+  --config '{"build":{"beforeBuildCommand":"bun run build"},"bundle":{"createUpdaterArtifacts":false}}' \
   --features metal
 
 echo "Local app: $REPO_DIR/target/release/bundle/macos/meetily.app"

@@ -28,6 +28,7 @@ import { ImportDialogProvider } from '@/contexts/ImportDialogContext'
 import { isAudioExtension, getAudioFormatsDisplayList } from '@/constants/audioFormats'
 import { MeetingDetectedPrompt } from '@/components/MeetingDetectedPrompt'
 import { AutoSummaryProvider } from '@/components/AutoSummaryProvider'
+import { usePathname } from 'next/navigation'
 
 
 const sourceSans3 = Source_Sans_3({
@@ -66,7 +67,7 @@ function ConditionalImportDialog({
 
 // export { metadata } from './metadata'
 
-export default function RootLayout({
+function MainAppLayout({
   children,
 }: {
   children: React.ReactNode
@@ -289,4 +290,20 @@ export default function RootLayout({
       </body>
     </html>
   )
+}
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+
+  if (pathname === '/meeting-prompt') {
+    return (
+      <html lang="en" className="bg-transparent">
+        <body className={`${sourceSans3.variable} bg-transparent font-sans antialiased`}>
+          {children}
+        </body>
+      </html>
+    )
+  }
+
+  return <MainAppLayout>{children}</MainAppLayout>
 }
