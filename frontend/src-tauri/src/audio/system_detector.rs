@@ -131,6 +131,7 @@ impl MacOSSystemAudioDetector {
         self.background.start(|running, mut stop_rx| {
             Box::pin(async move {
                 let (tx, mut notify_rx) = tokio::sync::mpsc::channel(1);
+                let polling_callback = callback.clone();
 
                 std::thread::spawn(move || {
                     let callback = std::sync::Arc::new(std::sync::Mutex::new(callback));
@@ -333,14 +334,31 @@ impl MacOSSystemAudioDetector {
 
                 let _ = notify_rx.recv().await;
 
+                let mut last_apps = Vec::new();
+                let mut scan_interval = tokio::time::interval(tokio::time::Duration::from_secs(2));
+
                 loop {
                     tokio::select! {
                         _ = &mut stop_rx => {
                             break;
                         }
-                        _ = tokio::time::sleep(tokio::time::Duration::from_millis(500)) => {
+                        _ = scan_interval.tick() => {
                             if !running.load(std::sync::atomic::Ordering::SeqCst) {
                                 break;
+                            }
+
+                            let mut apps = list_system_audio_using_apps();
+                            apps.sort_unstable();
+                            apps.dedup();
+
+                            if apps != last_apps {
+                                let event = if apps.is_empty() {
+                                    SystemAudioEvent::SystemAudioStopped
+                                } else {
+                                    SystemAudioEvent::SystemAudioStarted(apps.clone())
+                                };
+                                polling_callback(event);
+                                last_apps = apps;
                             }
                         }
                     }
@@ -372,10 +390,82 @@ fn list_system_audio_using_apps() -> Vec<String> {
                     }
                 }
             }
+
+            if browser_has_google_meet() {
+                apps.push("Google Meet".to_string());
+            }
             apps
         }
         Err(_) => Vec::new(),
     }
+}
+
+#[cfg(target_os = "macos")]
+fn browser_has_google_meet() -> bool {
+    const BROWSERS: [(&str, &str); 3] = [
+        ("com.google.Chrome", "Google Chrome"),
+        ("com.microsoft.edgemac", "Microsoft Edge"),
+        ("com.apple.Safari", "Safari"),
+    ];
+
+    BROWSERS.iter().any(|(bundle_id, application_name)| {
+        let bundle_id = cidre::ns::String::with_str(bundle_id);
+        !cidre::ns::RunningApp::with_bundle_id(&bundle_id).is_empty()
+            && browser_has_google_meet_tab(application_name)
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn browser_has_google_meet_tab(application_name: &str) -> bool {
+    let script = format!(
+        "tell application \"{}\" to get URL of every tab of every window",
+        application_name
+    );
+    let mut child = match std::process::Command::new("osascript")
+        .args(["-e", &script])
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+    {
+        Ok(child) => child,
+        _ => return false,
+    };
+
+    let deadline = Instant::now() + Duration::from_millis(1500);
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let output = match child.wait_with_output() {
+                    Ok(output) if status.success() => output,
+                    _ => return false,
+                };
+                return google_meet_url_is_open(&String::from_utf8_lossy(&output.stdout));
+            }
+            Ok(None) if Instant::now() < deadline => {
+                std::thread::sleep(Duration::from_millis(50));
+            }
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn google_meet_url_is_open(browser_urls: &str) -> bool {
+    browser_urls.split(',').any(|url| {
+        let Some(path) = url.trim().strip_prefix("https://meet.google.com/") else {
+            return false;
+        };
+        let meeting_code = path.split(['?', '#']).next().unwrap_or_default();
+        let parts: Vec<_> = meeting_code.split('-').collect();
+        parts.len() == 3
+            && [3, 4, 3].iter().zip(parts).all(|(length, part)| {
+                part.len() == *length && part.chars().all(|c| c.is_ascii_alphabetic())
+            })
+    })
 }
 
 // Stub implementation for non-macOS platforms
@@ -421,6 +511,20 @@ impl SystemAudioDetector {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn recognizes_google_meet_call_urls_only() {
+        assert!(google_meet_url_is_open(
+            "https://example.com, https://meet.google.com/abc-defg-hij"
+        ));
+        assert!(google_meet_url_is_open(
+            "https://meet.google.com/abc-defg-hij?authuser=0"
+        ));
+        assert!(!google_meet_url_is_open("https://meet.google.com/"));
+        assert!(!google_meet_url_is_open("https://meet.google.com/landing"));
+        assert!(!google_meet_url_is_open("https://youtube.com/watch?v=123"));
+    }
 
     #[tokio::test]
     #[ignore] // Only run manually as it requires audio hardware

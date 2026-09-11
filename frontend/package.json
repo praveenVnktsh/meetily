@@ -22,6 +22,7 @@
         "tauri:build:cuda": "tauri build -- --features cuda",
         "tauri:build:vulkan": "tauri build -- --features vulkan",
         "tauri:build:metal": "tauri build -- --features metal",
+        "tauri:build:local:mac": "bash scripts/build-local-macos.sh",
         "tauri:build:coreml": "tauri build -- --features coreml",
         "tauri:build:openblas": "tauri build -- --features openblas",
         "tauri:build:hipblas": "tauri build -- --features hipblas",

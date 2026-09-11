@@ -12,6 +12,7 @@ export interface RecordingPreferences {
   save_folder: string;
   auto_save: boolean;
   file_format: string;
+  automatic_record_prompt: boolean;
   preferred_mic_device: string | null;
   preferred_system_device: string | null;
 }
@@ -25,6 +26,7 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
     save_folder: '',
     auto_save: true,
     file_format: 'mp4',
+    automatic_record_prompt: true,
     preferred_mic_device: null,
     preferred_system_device: null
   });
@@ -83,6 +85,16 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
     });
   };
 
+  const handleAutomaticPromptToggle = async (enabled: boolean) => {
+    const newPreferences = { ...preferences, automatic_record_prompt: enabled };
+    setPreferences(newPreferences);
+    await savePreferences(newPreferences);
+
+    await Analytics.track('automatic_record_prompt_toggled', {
+      enabled: enabled.toString()
+    });
+  };
+
   const handleDeviceChange = async (devices: SelectedDevices) => {
     const newPreferences = {
       ...preferences,
@@ -135,6 +147,9 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
     try {
       await invoke('set_recording_preferences', { preferences: prefs });
       onSave?.(prefs);
+      window.dispatchEvent(new CustomEvent('automaticRecordPromptChanged', {
+        detail: prefs.automatic_record_prompt
+      }));
 
       // Show success toast with device details
       const micDevice = prefs.preferred_mic_device || 'Default';
@@ -181,6 +196,20 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
         <Switch
           checked={preferences.auto_save}
           onCheckedChange={handleAutoSaveToggle}
+          disabled={saving}
+        />
+      </div>
+
+      <div className="flex items-center justify-between p-4 border rounded-lg">
+        <div className="flex-1 pr-4">
+          <div className="font-medium">Meeting Detection Prompt</div>
+          <div className="text-sm text-gray-600">
+            Ask before recording when sustained audio is detected from a supported meeting app
+          </div>
+        </div>
+        <Switch
+          checked={preferences.automatic_record_prompt}
+          onCheckedChange={handleAutomaticPromptToggle}
           disabled={saving}
         />
       </div>

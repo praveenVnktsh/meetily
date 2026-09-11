@@ -25,8 +25,8 @@ use super::recording_preferences::get_default_recordings_folder;
 /// Global flag to track if import is in progress
 static IMPORT_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 
-/// Global flag to signal cancellation
-static IMPORT_CANCELLED: AtomicBool = AtomicBool::new(false);
+/// Global flag to signal cancellation (pub(crate) so transcription_queue can bridge to it)
+pub(crate) static IMPORT_CANCELLED: AtomicBool = AtomicBool::new(false);
 
 /// RAII guard for IMPORT_IN_PROGRESS flag
 /// Ensures flag is cleared even if import panics or returns early
@@ -555,6 +555,12 @@ async fn run_import<R: Runtime>(
             return Err(anyhow!("Import cancelled"));
         }
 
+        // Wait if the queue task is paused (blocks until resumed or cancelled)
+        if !super::transcription_queue::check_pause().await {
+            let _ = std::fs::remove_dir_all(&meeting_folder);
+            return Err(anyhow!("Import cancelled"));
+        }
+
         let progress = 30 + ((i as f32 / processable_count.max(1) as f32) * 50.0) as u32;
         let segment_duration_sec = (segment.end_timestamp_ms - segment.start_timestamp_ms) / 1000.0;
         emit_progress(
@@ -672,6 +678,20 @@ async fn run_import<R: Runtime>(
         segments_count: segments.len(),
         duration_seconds,
     })
+}
+
+/// Public entry point for the transcription queue to run an import
+/// Unlike start_import(), this does NOT use the ImportGuard (queue manages concurrency)
+/// and does NOT emit import-complete/import-error events (queue handles those)
+pub async fn run_import_for_queue<R: Runtime>(
+    app: AppHandle<R>,
+    source_path: String,
+    title: String,
+    language: Option<String>,
+    model: Option<String>,
+    provider: Option<String>,
+) -> Result<ImportResult> {
+    run_import(app, source_path, title, language, model, provider).await
 }
 
 /// Emit progress event
@@ -961,40 +981,43 @@ pub async fn validate_audio_file_command(path: String) -> Result<AudioFileInfo, 
 }
 
 /// Start importing an audio file (Beta gated using configContext.betaFeatures)
+/// Now enqueues to the transcription queue instead of running directly
 #[tauri::command]
 pub async fn start_import_audio_command<R: Runtime>(
-    app: AppHandle<R>,
+    _app: AppHandle<R>,
     source_path: String,
     title: String,
     language: Option<String>,
     model: Option<String>,
     provider: Option<String>,
 ) -> Result<ImportStarted, String> {
-    // Check if import is already in progress (guard will be acquired in start_import)
-    if IMPORT_IN_PROGRESS.load(Ordering::SeqCst) {
-        return Err("Import already in progress".to_string());
-    }
+    use super::transcription_queue::{get_queue, TranscriptionTask, TaskType, TaskStatus};
 
-    // Spawn import in background
-    tauri::async_runtime::spawn(async move {
-        let result = start_import(app, source_path, title, language, model, provider).await;
+    let task = TranscriptionTask {
+        task_id: String::new(), // Will be assigned by queue
+        task_type: TaskType::Import,
+        title: title.clone(),
+        status: TaskStatus::Pending,
+        source_path: Some(source_path),
+        meeting_id: None,
+        meeting_folder_path: None,
+        language,
+        model,
+        provider,
+    };
 
-        if let Err(e) = result {
-            error!("Import failed: {}", e);
-        }
-    });
+    let task_id = get_queue().enqueue(task).await;
+    info!("Import enqueued as task: {}", task_id);
 
     Ok(ImportStarted {
-        message: "Import started".to_string(),
+        message: format!("Import queued (task: {})", task_id),
     })
 }
 
-/// Cancel ongoing import
+/// Cancel ongoing import (kept for backward compatibility, delegates to queue)
 #[tauri::command]
 pub async fn cancel_import_command() -> Result<(), String> {
-    if !is_import_in_progress() {
-        return Err("No import in progress".to_string());
-    }
+    // Legacy cancel still works for direct imports
     cancel_import();
     Ok(())
 }

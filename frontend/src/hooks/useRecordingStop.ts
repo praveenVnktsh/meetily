@@ -1,17 +1,20 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { useTranscripts } from '@/contexts/TranscriptContext';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import { useRecordingState, RecordingStatus } from '@/contexts/RecordingStateContext';
 import { storageService } from '@/services/storageService';
 import { transcriptService } from '@/services/transcriptService';
+import { useConfig } from '@/contexts/ConfigContext';
 import Analytics from '@/lib/analytics';
 import {
   applyPinnedSummaryLanguageToMeeting,
   detectAndCacheSummaryLanguage,
 } from '@/lib/summary-language-preferences';
+import { markDeferredMeetingForAutoSummary } from '@/lib/autoSummary';
 
 type SummaryStatus = 'idle' | 'processing' | 'summarizing' | 'regenerating' | 'completed' | 'error';
 
@@ -68,6 +71,7 @@ export function useRecordingStop(
   } = useSidebar();
 
   const router = useRouter();
+  const { betaFeatures, selectedLanguage, transcriptModelConfig } = useConfig();
 
   // Guard to prevent duplicate/concurrent stop calls (e.g., from UI and tray simultaneously)
   const stopInProgressRef = useRef(false);
@@ -134,6 +138,8 @@ export function useRecordingStop(
     setIsRecording(false);
     setIsRecordingDisabled(true);
     const stopStartTime = Date.now();
+    const shouldDeferTranscription = betaFeatures.liveTranscription
+      && localStorage.getItem('liveTranscriptEnabled') === 'false';
 
     try {
       console.log('Post-stop processing (new implementation)...', {
@@ -152,7 +158,7 @@ export function useRecordingStop(
       const MAX_WAIT_TIME = 60000; // 60 seconds maximum wait (increased for longer processing)
       const POLL_INTERVAL = 500; // Check every 500ms
       let elapsedTime = 0;
-      let transcriptionComplete = false;
+      let transcriptionComplete = shouldDeferTranscription;
 
       // Listen for transcription-complete event
       const unlistenComplete = await listen('transcription-complete', () => {
@@ -201,7 +207,7 @@ export function useRecordingStop(
 
       if (!transcriptionComplete && elapsedTime >= MAX_WAIT_TIME) {
         console.warn('⏰ Transcription wait timeout reached after', elapsedTime, 'ms');
-      } else {
+      } else if (!shouldDeferTranscription) {
         console.log('✅ Transcription completed after', elapsedTime, 'ms');
         // Wait longer for any late transcript segments (increased from 1s to 4s)
         console.log('⏳ Waiting for late transcript segments...');
@@ -265,6 +271,23 @@ export function useRecordingStop(
             throw new Error('No meeting ID received from save operation');
           }
 
+          if (shouldDeferTranscription) {
+            if (!folderPath) {
+              throw new Error('Recording was saved without an audio folder, so deferred transcription could not start.');
+            }
+
+            await invoke('start_retranscription_command', {
+              meetingId,
+              meetingFolderPath: folderPath,
+              language: selectedLanguage === 'auto' || selectedLanguage === 'auto-translate'
+                ? null
+                : selectedLanguage,
+              model: transcriptModelConfig.model || null,
+              provider: transcriptModelConfig.provider || null,
+            });
+            markDeferredMeetingForAutoSummary(meetingId);
+          }
+
           let shouldDetectSummaryLanguage = false;
           try {
             shouldDetectSummaryLanguage = !(await applyPinnedSummaryLanguageToMeeting(meetingId));
@@ -275,7 +298,7 @@ export function useRecordingStop(
             });
           }
 
-          if (shouldDetectSummaryLanguage) {
+          if (shouldDetectSummaryLanguage && !shouldDeferTranscription) {
             try {
               await detectAndCacheSummaryLanguage(
                 meetingId,
@@ -292,6 +315,12 @@ export function useRecordingStop(
           console.log('✅ Successfully saved COMPLETE meeting with ID:', meetingId);
           console.log('   Transcripts:', freshTranscripts.length);
           console.log('   folder_path:', folderPath);
+
+          if (!shouldDeferTranscription) {
+            window.dispatchEvent(new CustomEvent('meetily:meeting-ready-for-summary', {
+              detail: { meetingId },
+            }));
+          }
 
           // Mark meeting as saved in IndexedDB (for recovery system)
           await markMeetingAsSaved();
@@ -323,8 +352,10 @@ export function useRecordingStop(
           setStatus(RecordingStatus.COMPLETED);
 
           // Show success toast with navigation option
-          toast.success('Recording saved successfully!', {
-            description: `${freshTranscripts.length} transcript segments saved.`,
+          toast.success(shouldDeferTranscription ? 'Recording saved — transcription queued' : 'Recording saved successfully!', {
+            description: shouldDeferTranscription
+              ? 'The transcript will appear when background processing finishes.'
+              : `${freshTranscripts.length} transcript segments saved.`,
             action: {
               label: 'View Meeting',
               onClick: () => {
@@ -435,6 +466,10 @@ export function useRecordingStop(
     meetings,
     setIsMeetingActive,
     router,
+    betaFeatures.liveTranscription,
+    selectedLanguage,
+    transcriptModelConfig.model,
+    transcriptModelConfig.provider,
   ]);
 
   // Expose handleRecordingStop function to window for Rust callbacks

@@ -8,6 +8,8 @@
     <string>This application needs screen recording permission to capture system audio during meetings.</string>
     <key>NSAudioCaptureUsageDescription</key>
     <string>This application needs permission to capture system audio output for meeting transcription and recording.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>Meetily checks supported browsers for active Google Meet calls so it can offer to start recording.</string>
     <key>com.apple.security.device.audio-input</key>
     <true/>
 </dict>

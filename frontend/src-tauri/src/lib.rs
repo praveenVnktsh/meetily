@@ -430,6 +430,13 @@ async fn start_recording_with_devices_and_meeting<R: Runtime>(
 }
 
 #[tauri::command]
+fn set_live_transcription_enabled(enabled: bool) -> Result<(), String> {
+    log_info!("Setting live transcription enabled: {}", enabled);
+    audio::pipeline::LIVE_TRANSCRIPTION_ENABLED.store(enabled, std::sync::atomic::Ordering::SeqCst);
+    Ok(())
+}
+
+#[tauri::command]
 async fn set_language_preference(language: String) -> Result<(), String> {
     let mut lang_pref = LANGUAGE_PREFERENCE
         .lock()
@@ -584,6 +591,9 @@ pub fn run() {
                 database::setup::initialize_database_on_startup(&_app.handle()).await
             })
             .expect("Failed to initialize database");
+
+            // Initialize transcription queue worker (processes import/retranscribe tasks sequentially)
+            audio::transcription_queue::init_queue_worker(&_app.handle());
 
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
@@ -774,6 +784,8 @@ pub fn run() {
             audio::recording_preferences::get_audio_backend_info,
             // Language preference commands
             set_language_preference,
+            // Live transcription toggle
+            set_live_transcription_enabled,
             // Notification system commands
             notifications::commands::get_notification_settings,
             notifications::commands::set_notification_settings,
@@ -830,6 +842,12 @@ pub fn run() {
             audio::import::start_import_audio_command,
             audio::import::cancel_import_command,
             audio::import::is_import_in_progress_command,
+            // Transcription queue commands
+            audio::transcription_queue::get_transcription_queue_status,
+            audio::transcription_queue::cancel_transcription_task,
+            audio::transcription_queue::pause_transcription_task,
+            audio::transcription_queue::resume_transcription_task,
+            audio::transcription_queue::is_transcription_queue_active,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
