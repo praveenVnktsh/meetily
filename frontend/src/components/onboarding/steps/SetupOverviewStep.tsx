@@ -98,7 +98,7 @@ export function SetupOverviewStep() {
           </Button>
           <div className="text-center">
             <a
-              href="https://github.com/Zackriya-Solutions/meeting-minutes"
+              href="https://github.com/praveenVnktsh/meetily/issues"
               target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-gray-600 hover:underline"
