@@ -18,7 +18,9 @@ import { MeetingWorkspace, type NotesMode } from '@/components/MeetingDetails/Me
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { MeetingAssistantPanel } from '@/components/MeetingDetails/MeetingAssistantPanel';
 import { MeetingRawNotesEditor } from '@/components/MeetingDetails/MeetingRawNotesEditor';
-import { MeetingRecordingView } from '@/components/MeetingDetails/MeetingRecordingView';
+import { LiveTranscriptPanel } from '@/components/MeetingDetails/LiveTranscriptPanel';
+import { FloatingRecordingControls } from '@/components/MeetingDetails/FloatingRecordingControls';
+import { LiveNotesPad } from '@/components/LiveNotesPad';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 
 // Custom hooks
@@ -381,9 +383,32 @@ export default function PageContent({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="flex h-screen min-w-0 flex-col bg-[var(--surface-0)]"
+        className="relative flex h-screen min-w-0 flex-col bg-surface-0"
       >
-        <MeetingRecordingView onStopInitiated={() => setPhase('transcribing')} />
+        <MeetingWorkspace
+          title={meetingData.meetingTitle}
+          createdAt={meeting.created_at}
+          notesMode="raw"
+          onNotesModeChange={() => {}}
+          canShowEnhanced={false}
+          summary={null}
+          rawNotes={<LiveNotesPad bare />}
+          transcript={<LiveTranscriptPanel />}
+          assistant={
+            <MeetingAssistantPanel
+              meetingId={meeting.id}
+              modelConfig={modelConfig}
+              setModelConfig={setModelConfig}
+              onSaveModelConfig={handleSaveModelConfig}
+              onNotesUpdated={(markdown) => meetingData.setAiSummary({ markdown })}
+              onTranscriptUpdated={onRefetchTranscripts}
+            />
+          }
+          showAssistant
+          peopleCount={0}
+          onTitleChange={handleTitleChange}
+        />
+        <FloatingRecordingControls onStopInitiated={() => setPhase('transcribing')} />
       </motion.div>
     );
   }

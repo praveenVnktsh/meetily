@@ -30,7 +30,7 @@ function storedFallback(folderPath: string | null): LiveNotesDocument | null {
   }
 }
 
-export function LiveNotesPad() {
+export function LiveNotesPad({ bare = false }: { bare?: boolean } = {}) {
   const { isRecording, recordingDuration } = useRecordingState();
   const [document, setDocument] = useState<LiveNotesDocument | null>(null);
   const [folderPath, setFolderPath] = useState<string | null>(null);
@@ -98,6 +98,16 @@ export function LiveNotesPad() {
 
   if (!document) {
     return <div className="flex h-full items-center justify-center text-sm text-ink-subtle">Preparing notes…</div>;
+  }
+
+  if (bare) {
+    return (
+      <div className="meeting-notes-editor raw-notes-editor h-full overflow-y-auto">
+        <div className="mx-auto w-full max-w-[860px] px-10 pb-24 pt-6">
+          <BlockNotesEditor document={document} onChange={handleDocumentChange} />
+        </div>
+      </div>
+    );
   }
 
   return (

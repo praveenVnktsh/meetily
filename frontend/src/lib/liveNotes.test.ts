@@ -21,6 +21,16 @@ describe('live meeting notes', () => {
     };
     const context = buildLiveNotesSummaryContext(document);
     expect(context).toContain('[00:12] IMPORTANT\n  Exact wording\nwith spacing  ');
-    expect(context).toContain('Never rewrite, replace');
+  });
+
+  it('returns raw markdown when present', () => {
+    const document: LiveNotesDocument = {
+      version: 2,
+      meetingStartedAtMs: 1,
+      updatedAt: '2026-01-01T00:00:00Z',
+      notes: [],
+      rawMarkdown: '- ship the release',
+    };
+    expect(buildLiveNotesSummaryContext(document)).toBe('- ship the release');
   });
 });

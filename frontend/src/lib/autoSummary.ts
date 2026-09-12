@@ -6,6 +6,7 @@ import {
   readCachedDetectedSummaryLanguage,
   readMeetingSummaryLanguage,
 } from '@/lib/summary-language-preferences';
+import { buildLiveNotesSummaryContext, type LiveNotesDocument } from '@/lib/liveNotes';
 
 const PENDING_DEFERRED_SUMMARIES_KEY = 'meetily:pending-deferred-auto-summaries';
 
@@ -80,6 +81,11 @@ export async function generateAutomaticSummary(meetingId: string, modelConfig: M
     return { started: false, reason: 'empty-transcript' as const };
   }
 
+  // Anchor the enhanced notes on whatever the user typed during the meeting.
+  const liveNotes = await invoke<LiveNotesDocument | null>('get_meeting_live_notes', { meetingId })
+    .catch(() => null);
+  const notesContext = buildLiveNotesSummaryContext(liveNotes);
+
   const summaryLanguage = await resolveSummaryLanguage(meetingId, transcriptTexts);
   await invoke('api_process_transcript', {
     text: transcriptTexts.join('\n'),
@@ -88,7 +94,7 @@ export async function generateAutomaticSummary(meetingId: string, modelConfig: M
     meetingId,
     chunkSize: 40000,
     overlap: 1000,
-    customPrompt: '',
+    customPrompt: notesContext,
     templateId: 'standard_meeting',
     summaryLanguage,
   });

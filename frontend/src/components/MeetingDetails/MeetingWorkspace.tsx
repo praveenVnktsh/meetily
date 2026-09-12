@@ -63,7 +63,7 @@ export function MeetingWorkspace({
 }) {
   const { compact } = useShell();
   const [transcriptOpen, setTranscriptOpen] = useState(true);
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
   const [ratio, setRatio] = useState(62);
   const [titleDraft, setTitleDraft] = useState(title);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -125,7 +125,7 @@ export function MeetingWorkspace({
       setChatOpen(false);
     } else if (!compact && prevCompactRef.current) {
       setTranscriptOpen(true);
-      setChatOpen(true);
+      setChatOpen(false);
     }
     prevCompactRef.current = compact;
   }, [compact]);

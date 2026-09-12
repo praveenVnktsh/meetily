@@ -29,6 +29,11 @@ export function createLiveNote(timestampSeconds: number): LiveNote {
   return { id: randomId, timestampSeconds, text: '', important: false };
 }
 
+/**
+ * The user's own notes, in markdown, passed to the summarizer as the anchor
+ * that the enhanced bullet notes build on. The backend wraps this in
+ * `<my_notes>` and merges it with the transcript.
+ */
 export function buildLiveNotesSummaryContext(document: LiveNotesDocument | null): string {
   if (!document) return '';
   const rawMarkdown = document.rawMarkdown?.trim();
@@ -37,10 +42,5 @@ export function buildLiveNotesSummaryContext(document: LiveNotesDocument | null)
     .filter((note) => note.text.length > 0)
     .map((note) => `[${formatNoteTimestamp(note.timestampSeconds)}]${note.important ? ' IMPORTANT' : ''}\n${note.text}`)
     .join('\n\n');
-  return [
-    'The following are the user\'s original live notes. Treat them as strong attention signals when deciding what to expand, emphasize, and include. Use the transcript as supporting evidence. Never rewrite, replace, or claim to edit the original notes.',
-    '<user_live_notes>',
-    rawMarkdown || notes,
-    '</user_live_notes>',
-  ].join('\n');
+  return rawMarkdown || notes;
 }
