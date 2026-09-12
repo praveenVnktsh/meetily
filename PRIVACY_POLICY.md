@@ -12,7 +12,7 @@ This distribution does not configure or transmit usage analytics. The legacy ana
 
 Meetily can connect to external AI providers only when you choose one and provide its configuration or credentials. Content sent through those features is processed under the selected provider's privacy policy and terms. Local providers do not require that transfer.
 
-The updater contacts GitHub Releases at `praveenVnktsh/meetily` to check for signed application updates. GitHub may receive ordinary network metadata associated with that request.
+The updater contacts GitHub Releases at `praveenvnktsh/minutes` to check for signed application updates. GitHub may receive ordinary network metadata associated with that request.
 
 ## Your control
 
@@ -24,7 +24,7 @@ Meetily relies on operating-system permissions and filesystem protections. No so
 
 ## Contact
 
-Questions and issues can be filed at [github.com/praveenVnktsh/meetily/issues](https://github.com/praveenVnktsh/meetily/issues).
+Questions and issues can be filed at [github.com/praveenvnktsh/minutes/issues](https://github.com/praveenvnktsh/minutes/issues).
 
 ## License
 
