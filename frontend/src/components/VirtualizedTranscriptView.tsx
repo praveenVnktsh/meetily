@@ -257,6 +257,26 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     // Use simple rendering for small lists, virtualization for large lists
     const useVirtualization = segments.length >= VIRTUALIZATION_THRESHOLD;
 
+    useEffect(() => {
+        const handleJump = (event: Event) => {
+            const { id, index } = (event as CustomEvent<{ id: string; index: number }>).detail;
+            if (index < 0 || index >= segments.length) return;
+            if (useVirtualization) {
+                virtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+            } else {
+                document.getElementById(`segment-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            window.setTimeout(() => {
+                document.getElementById(`segment-${id}`)?.animate(
+                    [{ backgroundColor: 'rgba(251, 191, 36, .22)' }, { backgroundColor: 'transparent' }],
+                    { duration: 1600 },
+                );
+            }, 250);
+        };
+        window.addEventListener('meetily:jump-to-transcript', handleJump);
+        return () => window.removeEventListener('meetily:jump-to-transcript', handleJump);
+    }, [segments.length, useVirtualization, virtualizer]);
+
     return (
         <div ref={scrollRef} className="flex flex-col h-full overflow-y-auto px-4 py-2">
             {/* Recording Status Bar - Sticky at top, always visible when recording */}

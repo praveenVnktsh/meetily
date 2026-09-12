@@ -18,6 +18,7 @@ import {
   readCachedDetectedSummaryLanguage,
 } from '@/lib/summary-language-preferences';
 import { parseSummaryContent, readSummaryMetadata } from '@/lib/summary-content';
+import { buildLiveNotesSummaryContext, type LiveNotesDocument } from '@/lib/liveNotes';
 
 async function resolveSummaryLanguage(
   meetingId: string,
@@ -452,6 +453,19 @@ export function useSummaryGeneration({
     };
   }, []);
 
+  const withLiveNotesContext = useCallback(async (customPrompt: string): Promise<string> => {
+    try {
+      const notes = await invokeTauri<LiveNotesDocument | null>('get_meeting_live_notes', {
+        meetingId: meeting.id,
+      });
+      const notesContext = buildLiveNotesSummaryContext(notes);
+      return [customPrompt, notesContext].filter(Boolean).join('\n\n');
+    } catch (error) {
+      console.warn('Could not load live notes for summary generation:', error);
+      return customPrompt;
+    }
+  }, [meeting.id]);
+
   const showPreflightError = useCallback((message: string) => {
     setSummaryError(message);
     setSummaryStatus('error');
@@ -503,7 +517,7 @@ export function useSummaryGeneration({
 
     await processSummary({
       ...buildSummaryTranscriptPayload(allTranscripts),
-      customPrompt,
+      customPrompt: await withLiveNotesContext(customPrompt),
     });
   }, [
     buildSummaryTranscriptPayload,
@@ -514,6 +528,7 @@ export function useSummaryGeneration({
     onOpenModelSettings,
     processSummary,
     showPreflightError,
+    withLiveNotesContext,
   ]);
 
   // Public API: Regenerate summary from the current saved transcript
@@ -528,9 +543,10 @@ export function useSummaryGeneration({
 
     await processSummary({
       ...buildSummaryTranscriptPayload(allTranscripts),
+      customPrompt: await withLiveNotesContext(''),
       isRegeneration: true
     });
-  }, [meeting.id, fetchAllTranscripts, buildSummaryTranscriptPayload, processSummary]);
+  }, [meeting.id, fetchAllTranscripts, buildSummaryTranscriptPayload, processSummary, withLiveNotesContext]);
 
   // Public API: Stop ongoing summary generation
   const handleStopGeneration = useCallback(async () => {

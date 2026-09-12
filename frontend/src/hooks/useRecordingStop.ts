@@ -19,6 +19,7 @@ import {
   LIVE_TRANSCRIPTION_STORAGE_KEY,
   shouldDeferTranscription,
 } from '@/lib/liveTranscription';
+import { LIVE_NOTES_FALLBACK_FOLDER_KEY, LIVE_NOTES_FALLBACK_KEY } from '@/lib/liveNotes';
 
 type SummaryStatus = 'idle' | 'processing' | 'summarizing' | 'regenerating' | 'completed' | 'error';
 
@@ -276,6 +277,19 @@ export function useRecordingStop(
           if (!meetingId) {
             console.error('No meeting_id in response:', responseData);
             throw new Error('No meeting ID received from save operation');
+          }
+
+          if (folderPath) {
+            try {
+              await invoke('attach_live_notes', { meetingId, folderPath });
+              localStorage.removeItem(LIVE_NOTES_FALLBACK_KEY);
+              localStorage.removeItem(LIVE_NOTES_FALLBACK_FOLDER_KEY);
+            } catch (error) {
+              // Notes remain in live-notes.json and localStorage, so this can be
+              // retried during recovery without risking the recording save.
+              console.warn('Live notes could not be attached yet:', error);
+              toast.warning('Meeting saved; live notes will remain recoverable');
+            }
           }
 
           if (deferTranscription) {
