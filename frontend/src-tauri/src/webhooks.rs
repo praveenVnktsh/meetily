@@ -329,8 +329,8 @@ mod tests {
             endpoint: endpoint.to_string(),
             signing_secret: "0123456789abcdef".to_string(),
         };
-        assert!(validate_config(&config("https://secretary.example/webhooks/meetily")).is_ok());
+        assert!(validate_config(&config("https://hooks.example.com/meetily")).is_ok());
         assert!(validate_config(&config("http://localhost:8787/webhook")).is_ok());
-        assert!(validate_config(&config("http://secretary.example/webhook")).is_err());
+        assert!(validate_config(&config("http://hooks.example.com/meetily")).is_err());
     }
 }

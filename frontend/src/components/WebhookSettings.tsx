@@ -81,8 +81,8 @@ export function WebhookSettings() {
       <div>
         <h2 className="text-xl font-semibold">Transcription webhook</h2>
         <p className="mt-1 text-sm text-gray-600">
-          Notify Secretary only after a meeting transcript has been finalized. Recording completion
-          alone never sends a webhook.
+          Notify your integration only after a meeting transcript has been finalized. Recording
+          completion alone never sends a webhook.
         </p>
       </div>
 
@@ -106,7 +106,7 @@ export function WebhookSettings() {
           type="url"
           value={config.endpoint}
           onChange={event => setConfig(current => ({ ...current, endpoint: event.target.value }))}
-          placeholder="https://secretary.example/webhooks/meetily"
+          placeholder="https://hooks.example.com/meetily"
           className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
         <p className="text-xs text-gray-500">HTTPS is required, except for localhost development.</p>
@@ -136,7 +136,7 @@ export function WebhookSettings() {
           </Button>
         </div>
         <p className="text-xs text-gray-500">
-          Verify the <code>x-meetily-signature</code> HMAC-SHA256 header in Secretary.
+          Verify the <code>x-meetily-signature</code> HMAC-SHA256 header in your receiver.
         </p>
       </div>
 
