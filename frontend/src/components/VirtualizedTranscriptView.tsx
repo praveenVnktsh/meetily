@@ -34,6 +34,8 @@ export interface VirtualizedTranscriptViewProps {
     totalCount?: number;
     loadedCount?: number;
     onLoadMore?: () => void;
+    speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
+    onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
 }
 
 // Threshold for enabling virtualization (below this, use simple rendering)
@@ -70,6 +72,9 @@ const TranscriptSegment = memo(function TranscriptSegment({
     text,
     confidence,
     speaker,
+    speakerId,
+    speakerOptions,
+    onSpeakerChange,
     isStreaming,
     showConfidence,
 }: {
@@ -77,7 +82,10 @@ const TranscriptSegment = memo(function TranscriptSegment({
     timestamp: number;
     text: string;
     confidence?: number;
-    speaker?: 'mic' | 'system';
+    speaker?: string;
+    speakerId?: string;
+    speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
+    onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
     isStreaming: boolean;
     showConfidence: boolean;
 }) {
@@ -99,15 +107,28 @@ const TranscriptSegment = memo(function TranscriptSegment({
                     </TooltipContent>
                 </Tooltip>
                 <div className="flex-1">
-                    {speaker && (
+                    {speaker && (speakerOptions?.length && onSpeakerChange ? (
+                        <select
+                            aria-label={`Speaker for transcript segment ${id}`}
+                            value={speakerId || speaker}
+                            onChange={(event) => onSpeakerChange(id, event.target.value)}
+                            className="mb-1 block max-w-[220px] rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-medium text-violet-700 focus:outline-none focus:ring-1 focus:ring-violet-400"
+                        >
+                            {speakerOptions.map((option) => (
+                                <option key={option.speaker_id} value={option.speaker_id}>
+                                    {option.display_name}
+                                </option>
+                            ))}
+                        </select>
+                    ) : (
                         <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
                             speaker === 'mic'
                                 ? 'bg-blue-50 text-blue-700'
                                 : 'bg-violet-50 text-violet-700'
                         }`}>
-                            {speaker === 'mic' ? 'You' : 'Others'}
+                            {speaker === 'mic' ? 'You' : speaker === 'system' ? 'Others' : speaker}
                         </span>
-                    )}
+                    ))}
                     {isStreaming ? (
                         <div className="bg-gray-100 border border-gray-200 rounded-lg px-3 py-2">
                             <p className="text-base text-gray-800 leading-relaxed">{displayText}</p>
@@ -135,6 +156,8 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     totalCount = 0,
     loadedCount = 0,
     onLoadMore,
+    speakerOptions,
+    onSpeakerChange,
 }) => {
     // Create scroll ref first - shared between virtualizer and auto-scroll hook
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -306,6 +329,9 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         text={getDisplayText(segment)}
                                         confidence={segment.confidence}
                                         speaker={segment.speaker}
+                                        speakerId={segment.speakerId}
+                                        speakerOptions={speakerOptions}
+                                        onSpeakerChange={onSpeakerChange}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
                                     />
@@ -363,6 +389,9 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         text={getDisplayText(segment)}
                                         confidence={segment.confidence}
                                         speaker={segment.speaker}
+                                        speakerId={segment.speakerId}
+                                        speakerOptions={speakerOptions}
+                                        onSpeakerChange={onSpeakerChange}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
                                     />

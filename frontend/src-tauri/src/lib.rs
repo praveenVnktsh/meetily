@@ -841,6 +841,10 @@ pub fn run() {
             audio::retranscription::cancel_retranscription_command,
             audio::retranscription::is_retranscription_in_progress_command,
             audio::diarization::run_speaker_diarization,
+            audio::speaker_corrections::get_speaker_identities,
+            audio::speaker_corrections::rename_speaker,
+            audio::speaker_corrections::merge_speakers,
+            audio::speaker_corrections::reassign_transcript_speaker,
             // Import audio commands
             audio::import::select_and_validate_audio_command,
             audio::import::validate_audio_file_command,

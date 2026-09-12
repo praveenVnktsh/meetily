@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import { Copy, FolderOpen, RefreshCw, Users } from 'lucide-react';
+import { Copy, FolderOpen, RefreshCw, UserRoundCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import Analytics from '@/lib/analytics';
 import { RetranscribeDialog } from './RetranscribeDialog';
@@ -18,6 +18,7 @@ interface TranscriptButtonGroupProps {
   meetingId?: string;
   meetingFolderPath?: string | null;
   onRefetchTranscripts?: () => Promise<void>;
+  onOpenSpeakerManager?: () => void;
 }
 
 
@@ -28,6 +29,7 @@ export function TranscriptButtonGroup({
   meetingId,
   meetingFolderPath,
   onRefetchTranscripts,
+  onOpenSpeakerManager,
 }: TranscriptButtonGroupProps) {
   const { betaFeatures } = useConfig();
   const [showRetranscribeDialog, setShowRetranscribeDialog] = useState(false);
@@ -122,6 +124,19 @@ export function TranscriptButtonGroup({
             <span className="hidden @[22rem]:inline">
               {isIdentifyingSpeakers ? 'Identifying…' : 'Speakers'}
             </span>
+          </Button>
+        )}
+
+        {meetingId && transcriptCount > 0 && onOpenSpeakerManager && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2 @[22rem]:px-4"
+            onClick={onOpenSpeakerManager}
+            title="Rename, merge, or reassign speakers"
+          >
+            <UserRoundCog className="@[22rem]:mr-2" size={18} />
+            <span className="hidden @[22rem]:inline">Names</span>
           </Button>
         )}
       </ButtonGroup>

@@ -444,10 +444,10 @@ export function useSummaryGeneration({
 
     return {
       transcriptText: allTranscripts
-        .map((transcript) => `${formatTime(transcript.audio_start_time, transcript.timestamp)}${transcript.speaker ? ` [${transcript.speaker === 'mic' ? 'You' : 'Others'}]` : ''} ${transcript.text}`)
+        .map((transcript) => `${formatTime(transcript.audio_start_time, transcript.timestamp)}${transcript.speaker ? ` [${transcript.speaker === 'mic' ? 'You' : transcript.speaker === 'system' ? 'Others' : transcript.speaker}]` : ''} ${transcript.text}`)
         .join('\n'),
       transcriptTexts: allTranscripts.map((transcript) =>
-        `${transcript.speaker ? `[${transcript.speaker === 'mic' ? 'You' : 'Others'}] ` : ''}${transcript.text}`
+        `${transcript.speaker ? `[${transcript.speaker === 'mic' ? 'You' : transcript.speaker === 'system' ? 'Others' : transcript.speaker}] ` : ''}${transcript.text}`
       ),
     };
   }, []);
