@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +24,7 @@ interface TranscriptButtonGroupProps {
   meetingFolderPath?: string | null;
   onRefetchTranscripts?: () => Promise<void>;
   onOpenSpeakerManager?: () => void;
+  locked?: boolean;
 }
 
 
@@ -36,11 +36,12 @@ export function TranscriptButtonGroup({
   meetingFolderPath,
   onRefetchTranscripts,
   onOpenSpeakerManager,
+  locked = false,
 }: TranscriptButtonGroupProps) {
   const { betaFeatures } = useConfig();
   const [showRetranscribeDialog, setShowRetranscribeDialog] = useState(false);
   const [isIdentifyingSpeakers, setIsIdentifyingSpeakers] = useState(false);
-  const hasMoreActions = Boolean(
+  const hasMoreActions = !locked && Boolean(
     meetingId && (
       (betaFeatures.importAndRetranscribe && meetingFolderPath)
       || (transcriptCount > 0 && (meetingFolderPath || onOpenSpeakerManager))
@@ -77,11 +78,11 @@ export function TranscriptButtonGroup({
 
   return (
     <div className="flex w-full items-center justify-end gap-2">
-      <ButtonGroup>
+      <div className="flex items-center gap-1.5">
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
-          className="px-2 @[22rem]:px-3"
+          className="h-8 rounded-full bg-[var(--surface-2)] px-3 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
           onClick={() => {
             Analytics.trackButtonClick('copy_transcript', 'meeting_details');
             onCopyTranscript();
@@ -95,8 +96,8 @@ export function TranscriptButtonGroup({
 
         <Button
           size="sm"
-          variant="outline"
-          className="px-2 @[22rem]:px-4"
+          variant="ghost"
+          className="h-8 rounded-full bg-[var(--surface-2)] px-3 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
           onClick={() => {
             Analytics.trackButtonClick('open_recording_folder', 'meeting_details');
             onOpenMeetingFolder();
@@ -109,7 +110,7 @@ export function TranscriptButtonGroup({
 
         {hasMoreActions && <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="outline" className="px-2.5" title="More transcript actions" aria-label="More transcript actions">
+            <Button size="sm" variant="ghost" className="h-8 rounded-full bg-[var(--surface-2)] px-2.5 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]" title="More transcript actions" aria-label="More transcript actions">
               <MoreHorizontal size={18} />
             </Button>
           </DropdownMenuTrigger>
@@ -135,7 +136,7 @@ export function TranscriptButtonGroup({
             )}
           </DropdownMenuContent>
         </DropdownMenu>}
-      </ButtonGroup>
+      </div>
 
       {betaFeatures.importAndRetranscribe && meetingId && meetingFolderPath && (
         <RetranscribeDialog

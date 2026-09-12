@@ -15,33 +15,65 @@ impl TranscriptsRepository {
         meeting_title: &str,
         transcripts: &[TranscriptSegment],
         folder_path: Option<String>,
+        meeting_id: Option<&str>,
     ) -> Result<String, SqlxError> {
-        let meeting_id = format!("meeting-{}", Uuid::new_v4());
-
         let mut conn = pool.acquire().await?;
         let mut transaction = conn.begin().await?;
 
         let now = Utc::now();
 
-        // 1. Create the new meeting
-        let result = sqlx::query(
-            "INSERT INTO meetings (id, title, created_at, updated_at, folder_path) VALUES (?, ?, ?, ?, ?)",
-        )
-        .bind(&meeting_id)
-        .bind(meeting_title)
-        .bind(now)
-        .bind(now)
-        .bind(&folder_path)
-        .execute(&mut *transaction)
-        .await;
+        // When the frontend already created the meeting at recording start, update
+        // that row (title/folder) and replace its transcript rows. Otherwise create
+        // a brand new meeting, preserving the legacy save path.
+        let meeting_id = match meeting_id {
+            Some(existing_id) => {
+                let updated = sqlx::query(
+                    "UPDATE meetings SET title = ?, folder_path = ?, updated_at = ? WHERE id = ?",
+                )
+                .bind(meeting_title)
+                .bind(&folder_path)
+                .bind(now)
+                .bind(existing_id)
+                .execute(&mut *transaction)
+                .await?;
 
-        if let Err(e) = result {
-            error!("Failed to create meeting '{}': {}", meeting_title, e);
-            transaction.rollback().await?;
-            return Err(e);
-        }
+                if updated.rows_affected() == 0 {
+                    transaction.rollback().await?;
+                    return Err(SqlxError::RowNotFound);
+                }
 
-        info!("Successfully created meeting with id: {}", meeting_id);
+                sqlx::query("DELETE FROM transcripts WHERE meeting_id = ?")
+                    .bind(existing_id)
+                    .execute(&mut *transaction)
+                    .await?;
+
+                info!("Updating existing meeting with id: {}", existing_id);
+                existing_id.to_string()
+            }
+            None => {
+                let new_id = format!("meeting-{}", Uuid::new_v4());
+
+                let result = sqlx::query(
+                    "INSERT INTO meetings (id, title, created_at, updated_at, folder_path) VALUES (?, ?, ?, ?, ?)",
+                )
+                .bind(&new_id)
+                .bind(meeting_title)
+                .bind(now)
+                .bind(now)
+                .bind(&folder_path)
+                .execute(&mut *transaction)
+                .await;
+
+                if let Err(e) = result {
+                    error!("Failed to create meeting '{}': {}", meeting_title, e);
+                    transaction.rollback().await?;
+                    return Err(e);
+                }
+
+                info!("Successfully created meeting with id: {}", new_id);
+                new_id
+            }
+        };
 
         // 2. Save each transcript segment with audio timing fields
         for segment in transcripts {

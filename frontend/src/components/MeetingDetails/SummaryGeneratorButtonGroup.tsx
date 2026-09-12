@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@/components/ui/visually-hidden"
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,66 +78,23 @@ export function SummaryGeneratorButtonGroup({
   }
 
   const isGenerating = summaryStatus === 'processing' || summaryStatus === 'summarizing' || summaryStatus === 'regenerating';
+  const selectedTemplateName = availableTemplates.find((template) => template.id === selectedTemplate)?.name ?? 'Template';
 
   return (
-    <ButtonGroup>
-      {/* Generate Summary or Stop button */}
-      {isGenerating ? (
-        <Button
-          variant="outline"
-          size="sm"
-          className="bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200 px-3 gap-2"
-          onClick={() => {
-            Analytics.trackButtonClick('stop_summary_generation', 'meeting_details');
-            onStopGeneration();
-          }}
-          title="Stop summary generation"
-        >
-          <Square size={18} fill="currentColor" />
-          <span className="hidden @[24rem]:inline">Stop</span>
-        </Button>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 border-blue-200 px-3 gap-2"
-          onClick={() => {
-            Analytics.trackButtonClick('generate_summary', 'meeting_details');
-            void onGenerateSummary(customPrompt);
-          }}
-          disabled={isModelConfigLoading}
-          title={
-            isModelConfigLoading
-              ? 'Loading model configuration...'
-              : hasSummary ? 'Regenerate AI Summary' : 'Generate AI Summary'
-          }
-        >
-          {isModelConfigLoading ? (
-            <>
-              <Loader2 className="animate-spin" size={18} />
-              <span className="hidden @[24rem]:inline">Processing...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={18} />
-              <span className="hidden @[24rem]:inline">{hasSummary ? 'Regenerate Summary' : 'Generate Summary'}</span>
-            </>
-          )}
-        </Button>
-      )}
-
+    <div className="flex flex-wrap items-center gap-1.5">
       {languageSlot}
 
       {/* Settings button */}
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
         <DialogTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             title="Summary Settings"
+            className="h-8 max-w-44 shrink-0 gap-1.5 rounded-full border border-hairline px-3 text-xs text-ink-muted hover:bg-surface-2 hover:text-ink"
           >
-            <Settings />
-            <span className="hidden @[40rem]:inline">AI Model</span>
+            <Settings className="h-3.5 w-3.5" />
+            <span className="max-w-32 truncate">{modelConfig.model || 'Choose model'}</span>
           </Button>
         </DialogTrigger>
         <DialogContent
@@ -165,12 +121,13 @@ export function SummaryGeneratorButtonGroup({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               title="Select summary template"
+              className="h-8 max-w-44 shrink-0 gap-1.5 rounded-full border border-hairline px-3 text-xs text-ink-muted hover:bg-surface-2 hover:text-ink"
             >
-              <FileText />
-              <span className="hidden @[40rem]:inline">Template</span>
+              <FileText className="h-3.5 w-3.5" />
+              <span className="max-w-32 truncate">{selectedTemplateName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -191,6 +148,6 @@ export function SummaryGeneratorButtonGroup({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-    </ButtonGroup>
+    </div>
   );
 }

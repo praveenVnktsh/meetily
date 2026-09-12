@@ -103,6 +103,18 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+
+    /* Minutes semantic surface tokens (light) */
+    --surface-0: #fbfaf7;
+    --surface-1: #f4f2ec;
+    --surface-2: #efede7;
+    --surface-raised: #ffffff;
+    --ink: #272622;
+    --ink-muted: #5d5a53;
+    --ink-subtle: #9b978d;
+    --hairline: #e5e2da;
+    --brand: #272622;
+    --brand-foreground: #ffffff;
   }
 
   .dark {
@@ -130,6 +142,18 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* Minutes semantic surface tokens (dark) */
+    --surface-0: #1b1b1b;
+    --surface-1: #171717;
+    --surface-2: #262626;
+    --surface-raised: #232323;
+    --ink: #ededed;
+    --ink-muted: #a3a3a3;
+    --ink-subtle: #737373;
+    --hairline: #2e2e2e;
+    --brand: #f5f5f5;
+    --brand-foreground: #171717;
   }
 }
 
@@ -141,9 +165,31 @@
   /* html, */
   body {
     @apply text-foreground;
-    background: #fbfaf7;
+    background: var(--surface-0);
+    color: var(--ink);
     overflow: hidden;
     height: 100%;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* Native form controls don't always pick up inherited theme colors. */
+  input,
+  textarea,
+  select {
+    color: var(--ink);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink-subtle);
+  }
+
+  select option {
+    background-color: var(--surface-raised);
+    color: var(--ink);
   }
 
   /* Make the window draggable */
@@ -186,12 +232,15 @@
     width: 100% !important;
     max-width: none !important;
     overflow: visible !important;
+    background: transparent !important;
   }
 
   .bn-editor {
     width: 100% !important;
     max-width: none !important;
     overflow: visible !important;
+    background: transparent !important;
+    padding-inline: 0 !important;
   }
 
   /* Disable internal scrolling - let parent handle all scrolling */
@@ -206,6 +255,72 @@
 
   .bn-default-styles {
     max-width: none !important;
+  }
+
+  .meeting-notes-editor .bn-container,
+  .meeting-notes-editor .bn-editor,
+  .meeting-notes-editor .bn-default-styles,
+  .meeting-notes-editor [data-color-scheme] {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Keep BlockNote documents on the app's serif document font */
+  .bn-container {
+    --bn-font-family: var(--font-source-serif-4), ui-serif, Georgia, Cambria, "Times New Roman", serif;
+    font-family: var(--bn-font-family);
+  }
+
+  .bn-default-styles {
+    font-family: var(--bn-font-family) !important;
+  }
+
+  /* BlockNote ships its own scoped shadcn vars on .bn-shadcn (dark defaults to
+     near-black text). Re-point them at our dark surface/ink so the document
+     and its menus/toolbars stay legible. */
+  .dark .bn-shadcn {
+    --background: 0 0% 11%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 13.3%;
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 13.7%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 93%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 55%;
+  }
+
+  .dark .bn-editor,
+  .dark .bn-container .bn-editor {
+    color: var(--ink) !important;
+  }
+
+  /* Dark theme for BlockNote editors (menus, tooltips, text) */
+  .dark .bn-container {
+    --bn-colors-editor-text: #ededed;
+    --bn-colors-editor-background: transparent;
+    --bn-colors-menu-text: #ededed;
+    --bn-colors-menu-background: #232323;
+    --bn-colors-tooltip-text: #ededed;
+    --bn-colors-tooltip-background: #2a2a2a;
+    --bn-colors-hovered-text: #ededed;
+    --bn-colors-hovered-background: #2a2a2a;
+    --bn-colors-selected-text: #171717;
+    --bn-colors-selected-background: #ededed;
+    --bn-colors-disabled-text: #737373;
+    --bn-colors-disabled-background: #262626;
+    --bn-colors-side-menu: #737373;
+    --bn-colors-border: #2e2e2e;
+    --bn-colors-shadow: #000000;
   }
 
   /* Disable scrolling on any BlockNote wrapper elements */

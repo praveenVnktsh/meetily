@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { invoke } from '@tauri-apps/api/core';
 import { useTranscripts } from '@/contexts/TranscriptContext';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useRecordingState, RecordingStatus } from '@/contexts/RecordingStateContext';
 import { recordingService } from '@/services/recordingService';
+import { storageService } from '@/services/storageService';
 import Analytics from '@/lib/analytics';
 import { showRecordingNotification } from '@/lib/recordingNotification';
 import {
@@ -19,7 +21,7 @@ import {
 } from '@/lib/liveTranscription';
 
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE = 'TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED';
-const TRANSCRIPTION_RUNTIME_USER_MESSAGE = 'Speech recognition could not initialize. Restart Meetily. If the problem continues, repair or reinstall the app.';
+const TRANSCRIPTION_RUNTIME_USER_MESSAGE = 'Speech recognition could not initialize. Restart Minutes. If the problem continues, repair or reinstall the app.';
 
 const isTranscriptionRuntimeStartError = (error: unknown) =>
   String(error) === TRANSCRIPTION_RUNTIME_START_ERROR_CODE;
@@ -56,9 +58,10 @@ export function useRecordingStart(
   const isStartingRef = useRef(false);
 
   const { clearTranscripts, setMeetingTitle } = useTranscripts();
-  const { setIsMeetingActive } = useSidebar();
+  const { setIsMeetingActive, setCurrentMeeting, refetchMeetings } = useSidebar();
   const { selectedDevices, betaFeatures } = useConfig();
   const { setStatus } = useRecordingState();
+  const router = useRouter();
 
   // Generate meeting title with timestamp
   const generateMeetingTitle = useCallback(() => {
@@ -128,6 +131,28 @@ export function useRecordingStart(
     return enabled;
   }, [betaFeatures.liveTranscription]);
 
+  // The recording folder is created by the backend during start. Grab it so the
+  // meeting row can be linked to the audio from the very beginning, then open
+  // the meeting workspace so recording, notes, and transcript share one screen.
+  const openRecordingWorkspace = useCallback(async (title: string) => {
+    let folderPath: string | null = null;
+    for (let attempt = 0; attempt < 12 && !folderPath; attempt += 1) {
+      folderPath = await invoke<string | null>('get_meeting_folder_path').catch(() => null);
+      if (!folderPath) await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    try {
+      const { meeting_id } = await storageService.createMeeting(title, folderPath);
+      if (!meeting_id) return;
+      sessionStorage.setItem('active_recording_meeting_id', meeting_id);
+      setCurrentMeeting({ id: meeting_id, title });
+      await refetchMeetings();
+      router.push(`/meeting-details?id=${meeting_id}&recording=1`);
+    } catch (error) {
+      console.error('Failed to create the meeting workspace for recording:', error);
+    }
+  }, [refetchMeetings, router, setCurrentMeeting]);
+
   // Handle manual recording start (from button click)
   const handleRecordingStart = useCallback(async () => {
     if (isStartingRef.current) {
@@ -189,6 +214,9 @@ export function useRecordingStart(
 
       // Show recording notification if enabled
       await showRecordingNotification();
+
+      // Open the meeting workspace so the whole session lives on one screen.
+      await openRecordingWorkspace(randomTitle);
     } catch (error) {
       console.error('Failed to start recording:', error);
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -220,7 +248,7 @@ export function useRecordingStart(
     } finally {
       isStartingRef.current = false;
     }
-  }, [generateMeetingTitle, setMeetingTitle, setIsRecording, clearTranscripts, setIsMeetingActive, checkModelReady, checkIfModelDownloading, configureLiveTranscription, selectedDevices, showModal, setStatus]);
+  }, [generateMeetingTitle, setMeetingTitle, setIsRecording, clearTranscripts, setIsMeetingActive, checkModelReady, checkIfModelDownloading, configureLiveTranscription, selectedDevices, showModal, setStatus, openRecordingWorkspace]);
 
   // Check for autoStartRecording flag and start recording automatically
   useEffect(() => {
@@ -281,6 +309,9 @@ export function useRecordingStart(
 
             // Show recording notification if enabled
             await showRecordingNotification();
+
+            // Open the meeting workspace so the whole session lives on one screen.
+            await openRecordingWorkspace(generatedMeetingTitle);
           } catch (error) {
             console.error('Failed to auto-start recording:', error);
             const errorMsg = error instanceof Error ? error.message : String(error);
@@ -319,6 +350,7 @@ export function useRecordingStart(
     configureLiveTranscription,
     showModal,
     setStatus,
+    openRecordingWorkspace,
   ]);
 
   // Listen for direct recording trigger from sidebar when already on home page
@@ -380,6 +412,9 @@ export function useRecordingStart(
 
         // Show recording notification if enabled
         await showRecordingNotification();
+
+        // Open the meeting workspace so the whole session lives on one screen.
+        await openRecordingWorkspace(generatedMeetingTitle);
       } catch (error) {
         console.error('Failed to start recording from sidebar:', error);
         const errorMsg = error instanceof Error ? error.message : String(error);
@@ -420,6 +455,7 @@ export function useRecordingStart(
     configureLiveTranscription,
     showModal,
     setStatus,
+    openRecordingWorkspace,
   ]);
 
   return {

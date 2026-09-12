@@ -28,12 +28,7 @@ export function AutoSummaryProvider() {
       }));
 
       try {
-        const result = await generateAutomaticSummary(meetingId, modelConfig);
-        if (result.started) {
-          toast.info('Generating meeting summary...', {
-            description: `Using ${modelConfig.provider}/${modelConfig.model}`,
-          });
-        }
+        await generateAutomaticSummary(meetingId, modelConfig);
       } catch (error) {
         console.error('[AutoSummary] Failed to start summary:', error);
         toast.error('Automatic summary could not start', {

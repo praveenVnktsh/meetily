@@ -327,11 +327,11 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
   return (
     <TooltipProvider>
       <div className="flex flex-col space-y-2">
-        <div className="flex min-h-14 items-center gap-2 rounded-2xl border border-[#dedbd2] bg-white/95 p-1.5 shadow-[0_12px_35px_rgba(45,43,37,0.14)] backdrop-blur">
+        <div className="flex min-h-14 items-center gap-2 rounded-2xl border border-[var(--hairline)] bg-[var(--surface-raised)] p-1.5 shadow-[0_12px_35px_rgba(45,43,37,0.14)] backdrop-blur">
           {isProcessing && !isParentProcessing ? (
             <div className="flex items-center gap-2 px-4 py-2">
-              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#d1cec5] border-t-[#272622]" />
-              <span className="text-sm text-[#5d5a53]">Finishing your meeting…</span>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#d1cec5] border-t-[var(--ink)]" />
+              <span className="text-sm text-[var(--ink-muted)]">Finishing your meeting…</span>
             </div>
           ) : !isRecording ? (
             <button
@@ -340,7 +340,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
                 handleStartRecording();
               }}
               disabled={isStarting || isProcessing || isRecordingDisabled || isValidatingModel || isStartingRecording}
-              className="flex h-11 min-w-[174px] items-center justify-center gap-2 rounded-xl bg-[#272622] px-5 text-sm font-semibold text-white transition hover:bg-black disabled:bg-[#aaa69b]"
+              className="flex h-11 min-w-[174px] items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-semibold text-brand-foreground transition hover:opacity-90 disabled:opacity-40"
             >
               {isValidatingModel || isStartingRecording ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
@@ -351,14 +351,14 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
             </button>
           ) : (
             <>
-              <div className="flex min-w-[104px] items-center gap-2 px-3 text-sm font-medium text-[#5d5a53]">
+              <div className="flex min-w-[104px] items-center gap-2 px-3 text-sm font-medium text-[var(--ink-muted)]">
                 <span className={`h-2 w-2 rounded-full ${isPaused ? 'bg-amber-500' : 'animate-pulse bg-[#d74d3f]'}`} />
                 {formatTime(recordingState.recordingDuration ?? 0)}
               </div>
               <button
                 onClick={() => isPaused ? handleResumeRecording() : handlePauseRecording()}
                 disabled={isPausing || isResuming || isStopping}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-[#5d5a53] hover:bg-[#efede7] disabled:opacity-40"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-[var(--ink-muted)] hover:bg-[var(--surface-2)] disabled:opacity-40"
                 title={isPaused ? 'Resume recording' : 'Pause recording'}
               >
                 {isPaused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
@@ -369,7 +369,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
                   void handleStopRecording();
                 }}
                 disabled={isStopping || isPausing || isResuming || isStartingRecording}
-                className="flex h-10 items-center gap-2 rounded-xl bg-[#d74d3f] px-4 text-sm font-semibold text-white hover:bg-[#bd3f33] disabled:bg-[#aaa69b]"
+                className="flex h-10 items-center gap-2 rounded-xl bg-[#d74d3f] px-4 text-sm font-semibold text-white hover:bg-[#bd3f33] disabled:bg-[var(--ink-subtle)]"
               >
                 <Square className="h-3.5 w-3.5 fill-current" /> {isStopping ? 'Ending…' : 'End meeting'}
               </button>
@@ -379,7 +379,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
 
         {/* Show validation status only */}
         {isValidatingModel && (
-          <div className="text-xs text-gray-600 text-center mt-2">
+          <div className="text-xs text-ink-muted text-center mt-2">
             Validating speech recognition...
           </div>
         )}
@@ -409,7 +409,7 @@ export const RecordingControls: React.FC<RecordingControlsProps> = ({
         )}
 
         {/* {showPlayback && recordingPath && (
-        <div className="text-sm text-gray-600 px-4">
+        <div className="text-sm text-ink-muted px-4">
           Recording saved to: {recordingPath}
         </div>
       )} */}

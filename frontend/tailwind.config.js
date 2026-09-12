@@ -11,11 +11,30 @@ module.exports = {
   		fontFamily: {
   			sans: [
   				'var(--font-source-sans-3)'
+  			],
+  			serif: [
+  				'var(--font-source-serif-4)'
   			]
   		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
+  			surface: {
+  				'0': 'var(--surface-0)',
+  				'1': 'var(--surface-1)',
+  				'2': 'var(--surface-2)',
+  				'raised': 'var(--surface-raised)'
+  			},
+  			ink: {
+  				DEFAULT: 'var(--ink)',
+  				muted: 'var(--ink-muted)',
+  				subtle: 'var(--ink-subtle)'
+  			},
+  			hairline: 'var(--hairline)',
+  			brand: {
+  				DEFAULT: 'var(--brand)',
+  				foreground: 'var(--brand-foreground)'
+  			},
   			border: 'hsl(var(--border))',
   			input: 'hsl(var(--input))',
   			ring: 'hsl(var(--ring))',

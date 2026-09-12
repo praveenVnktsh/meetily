@@ -6,15 +6,16 @@ import { TranscriptButtonGroup } from './TranscriptButtonGroup';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import { Loader2, Search, X } from 'lucide-react';
 import { SpeakerCorrectionDialog, SpeakerIdentity } from './SpeakerCorrectionDialog';
 
 interface TranscriptPanelProps {
   transcripts: Transcript[];
-  customPrompt: string;
-  onPromptChange: (value: string) => void;
   onCopyTranscript: () => void;
   onOpenMeetingFolder: () => Promise<void>;
   isRecording: boolean;
+  isTranscribing?: boolean;
+  locked?: boolean;
   disableAutoScroll?: boolean;
 
   // Optional pagination props (when using virtualization)
@@ -34,11 +35,11 @@ interface TranscriptPanelProps {
 
 export function TranscriptPanel({
   transcripts,
-  customPrompt,
-  onPromptChange,
   onCopyTranscript,
   onOpenMeetingFolder,
   isRecording,
+  isTranscribing = false,
+  locked = false,
   disableAutoScroll = false,
   usePagination = false,
   segments,
@@ -53,6 +54,7 @@ export function TranscriptPanel({
 }: TranscriptPanelProps) {
   const [showSpeakerDialog, setShowSpeakerDialog] = useState(false);
   const [speakerOptions, setSpeakerOptions] = useState<SpeakerIdentity[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const refreshSpeakers = useCallback(async () => {
     if (!meetingId) return;
@@ -96,10 +98,16 @@ export function TranscriptPanel({
     }));
   }, [transcripts, usePagination, segments]);
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const displaySegments = useMemo(() => {
+    if (!normalizedQuery) return convertedSegments;
+    return convertedSegments.filter((segment) => segment.text.toLowerCase().includes(normalizedQuery));
+  }, [convertedSegments, normalizedQuery]);
+
   return (
-    <div className="flex h-full min-w-0 w-full bg-[#fbfaf7] flex-col relative @container">
+    <div className="flex h-full min-w-0 w-full bg-[var(--surface-0)] flex-col relative @container">
       {/* Title area */}
-      <div className="mx-auto w-full max-w-[900px] px-8 py-3">
+      <div className="mx-auto w-full max-w-[900px] px-8 pb-2 pt-4">
         <TranscriptButtonGroup
           transcriptCount={usePagination ? (totalCount ?? convertedSegments.length) : (transcripts?.length || 0)}
           onCopyTranscript={onCopyTranscript}
@@ -108,42 +116,64 @@ export function TranscriptPanel({
           meetingFolderPath={meetingFolderPath}
           onRefetchTranscripts={onRefetchTranscripts}
           onOpenSpeakerManager={() => setShowSpeakerDialog(true)}
+          locked={locked}
         />
+        <div className="relative mt-3">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-subtle)]" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search transcript…"
+            className="h-9 w-full rounded-xl border border-hairline bg-[var(--surface-1)] pl-9 pr-9 text-sm text-ink outline-none placeholder:text-[var(--ink-subtle)] focus:border-[var(--ink-subtle)]"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--ink-subtle)] hover:bg-[var(--surface-2)]"
+              aria-label="Clear transcript search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
+        {locked && convertedSegments.length > 0 && (
+          <p className="mt-2 text-[11px] text-[var(--ink-subtle)]">Transcript is locked while the summary is being generated.</p>
+        )}
       </div>
 
       {/* Transcript content - use virtualized view for better performance */}
-      <div className="mx-auto w-full max-w-[900px] flex-1 overflow-hidden pb-4">
-        <VirtualizedTranscriptView
-          segments={convertedSegments}
-          isRecording={isRecording}
-          isPaused={false}
-          isProcessing={false}
-          isStopping={false}
-          enableStreaming={false}
-          showConfidence={true}
-          disableAutoScroll={disableAutoScroll}
-          hasMore={hasMore}
-          isLoadingMore={isLoadingMore}
-          totalCount={totalCount}
-          loadedCount={loadedCount}
-          onLoadMore={onLoadMore}
-          speakerOptions={speakerOptions}
-          onSpeakerChange={meetingId ? handleSpeakerReassignment : undefined}
-        />
-      </div>
-
-      {/* Optional context stays available without competing with the transcript. */}
-      {!isRecording && convertedSegments.length > 0 && (
-        <div className="border-t border-[#e5e2da] px-8 py-3">
-          <details className="mx-auto w-full max-w-[900px] text-xs text-[#77736a]">
-            <summary className="cursor-pointer select-none hover:text-[#272622]">Add context for the AI notes</summary>
-            <textarea
-              placeholder="People involved, meeting objective, or anything the summary should emphasize…"
-              className="mt-3 min-h-[72px] w-full resize-y rounded-xl border border-[#dedbd2] bg-white px-3 py-2 text-sm text-[#272622] outline-none placeholder:text-[#aaa69b] focus:border-[#aaa69b]"
-              value={customPrompt}
-              onChange={(e) => onPromptChange(e.target.value)}
-            />
-          </details>
+      {isTranscribing && convertedSegments.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-16 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--ink-subtle)]" />
+          <div>
+            <p className="text-sm font-medium text-[var(--ink-muted)]">Transcribing meeting audio…</p>
+            <p className="mt-1 text-xs text-[var(--ink-subtle)]">This can take a moment. Your notes are safe and stay editable meanwhile.</p>
+          </div>
+        </div>
+      ) : normalizedQuery && displaySegments.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center px-8 pb-16 text-center text-sm text-[var(--ink-subtle)]">
+          No transcript matches “{searchQuery.trim()}”.
+        </div>
+      ) : (
+        <div className="mx-auto w-full max-w-[900px] flex-1 overflow-hidden pb-4">
+          <VirtualizedTranscriptView
+            segments={displaySegments}
+            isRecording={isRecording}
+            isPaused={false}
+            isProcessing={false}
+            isStopping={false}
+            enableStreaming={false}
+            showConfidence={true}
+            disableAutoScroll={disableAutoScroll}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            totalCount={totalCount}
+            loadedCount={loadedCount}
+            onLoadMore={onLoadMore}
+            speakerOptions={speakerOptions}
+            onSpeakerChange={meetingId && !locked ? handleSpeakerReassignment : undefined}
+          />
         </div>
       )}
 

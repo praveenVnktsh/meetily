@@ -8,6 +8,7 @@ import { Block } from '@blocknote/core';
 import { useCreateBlockNote } from '@blocknote/react';
 import { BlockNoteView } from '@blocknote/shadcn';
 import { blocksToMarkdownSafely } from '@/lib/blocknote-markdown';
+import { toast } from 'sonner';
 import "@blocknote/shadcn/style.css";
 
 // Dynamically import BlockNote Editor to avoid SSR issues
@@ -80,6 +81,7 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
   const [currentBlocks, setCurrentBlocks] = useState<Block[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const isContentLoaded = useRef(false);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Create BlockNote editor for markdown parsing
   const editor = useCreateBlockNote({
@@ -163,6 +165,38 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
       setIsSaving(false);
     }
   }, [onSave, isDirty, currentBlocks, editor]);
+
+  // Enhanced notes behave like a normal notes surface: edits are persisted
+  // after a short idle period, with no explicit Save action required.
+  useEffect(() => {
+    if (!isDirty || !onSave) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      void handleSave().catch((error) => {
+        toast.error('Could not autosave enhanced notes', { description: String(error) });
+      });
+    }, 650);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [currentBlocks, handleSave, isDirty, onSave]);
+
+  // Keep the latest save handler reachable from the unmount cleanup so a pending
+  // debounce is flushed when the meeting page goes away instead of being dropped.
+  const handleSaveRef = useRef(handleSave);
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+    isDirtyRef.current = isDirty;
+  }, [handleSave, isDirty]);
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    if (isDirtyRef.current) {
+      void handleSaveRef.current().catch(() => {});
+    }
+  }, []);
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({

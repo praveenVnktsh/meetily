@@ -266,11 +266,15 @@ export function useRecordingStop(
         });
 
         try {
+          // The meeting row was created when recording started, so finalize that
+          // same meeting instead of creating a duplicate at stop.
+          const activeMeetingId = sessionStorage.getItem('active_recording_meeting_id');
           const responseData = await storageService.saveMeeting(
             savedMeetingName || meetingTitle || 'New Meeting',  // PREFER savedMeetingName (backend source)
             freshTranscripts,
             folderPath,
-            !shouldDeferTranscription
+            !shouldDeferTranscription,
+            activeMeetingId
           );
 
           const meetingId = responseData.meeting_id;
@@ -279,11 +283,19 @@ export function useRecordingStop(
             throw new Error('No meeting ID received from save operation');
           }
 
+          // Persist the notes the user typed during the meeting. The folder copy can
+          // lag the debounce queue, so the in-memory copy is the source of truth.
+          let fallbackDocument: unknown = null;
+          try {
+            const fallbackRaw = localStorage.getItem(LIVE_NOTES_FALLBACK_KEY);
+            fallbackDocument = fallbackRaw ? JSON.parse(fallbackRaw) : null;
+          } catch (error) {
+            console.warn('Could not read in-memory live notes:', error);
+          }
+
           if (folderPath) {
             try {
               await invoke('attach_live_notes', { meetingId, folderPath });
-              localStorage.removeItem(LIVE_NOTES_FALLBACK_KEY);
-              localStorage.removeItem(LIVE_NOTES_FALLBACK_FOLDER_KEY);
             } catch (error) {
               // Notes remain in live-notes.json and localStorage, so this can be
               // retried during recovery without risking the recording save.
@@ -291,6 +303,17 @@ export function useRecordingStop(
               toast.warning('Meeting saved; live notes will remain recoverable');
             }
           }
+
+          if (fallbackDocument) {
+            try {
+              await invoke('save_meeting_live_notes', { meetingId, document: fallbackDocument });
+            } catch (error) {
+              console.warn('Could not persist live notes to the meeting:', error);
+            }
+          }
+
+          localStorage.removeItem(LIVE_NOTES_FALLBACK_KEY);
+          localStorage.removeItem(LIVE_NOTES_FALLBACK_FOLDER_KEY);
 
           if (deferTranscription) {
             if (!folderPath) {
@@ -386,30 +409,14 @@ export function useRecordingStop(
           // Mark as completed
           setStatus(RecordingStatus.COMPLETED);
 
-          // Show success toast with navigation option
-          toast.success(deferTranscription ? 'Recording saved — transcription queued' : 'Recording saved successfully!', {
-            description: deferTranscription
-              ? 'The transcript will appear when background processing finishes.'
-              : `${freshTranscripts.length} transcript segments saved.`,
-            action: {
-              label: 'View Meeting',
-              onClick: () => {
-                router.push(`/meeting-details?id=${meetingId}`);
-                Analytics.trackButtonClick('view_meeting_from_toast', 'recording_complete');
-              }
-            },
-            duration: 10000,
-          });
-
-          // Auto-navigate after a short delay with source parameter
-          setTimeout(() => {
-            router.push(`/meeting-details?id=${meetingId}&source=recording`);
-            clearTranscripts()
-            Analytics.trackPageView('meeting_details');
-
-            // Reset to IDLE after navigation
-            setStatus(RecordingStatus.IDLE);
-          }, 2000);
+          // The workspace is already open on this meeting, so hand post-processing
+          // back to it instead of navigating anywhere.
+          window.dispatchEvent(new CustomEvent('meetily:recording-finalized', {
+            detail: { meetingId, transcribing: deferTranscription },
+          }));
+          sessionStorage.removeItem('active_recording_meeting_id');
+          clearTranscripts();
+          setStatus(RecordingStatus.IDLE);
           // Track meeting completion analytics
           try {
             // Calculate meeting duration from transcript timestamps

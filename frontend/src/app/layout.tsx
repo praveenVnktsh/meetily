@@ -1,12 +1,12 @@
 'use client'
 
 import './globals.css'
-import { Source_Sans_3 } from 'next/font/google'
+import { Source_Sans_3, Source_Serif_4 } from 'next/font/google'
 import SimpleSidebar from '@/components/SimpleSidebar'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
 import MainContent from '@/components/MainContent'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
-import { Toaster, toast } from 'sonner'
+import { toast } from 'sonner'
 import "sonner/dist/styles.css"
 import { useState, useEffect, useCallback } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
@@ -29,12 +29,20 @@ import { isAudioExtension, getAudioFormatsDisplayList } from '@/constants/audioF
 import { MeetingDetectedPrompt } from '@/components/MeetingDetectedPrompt'
 import { AutoSummaryProvider } from '@/components/AutoSummaryProvider'
 import { usePathname } from 'next/navigation'
+import { ShellProvider } from '@/contexts/ShellContext'
+import { ThemedToaster } from '@/components/ThemedToaster'
 
 
 const sourceSans3 = Source_Sans_3({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
   variable: '--font-source-sans-3',
+})
+
+const sourceSerif4 = Source_Serif_4({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-source-serif-4',
 })
 
 // Module-level component — stable reference across RootLayout re-renders.
@@ -235,8 +243,8 @@ function MainAppLayout({
   }
 
   return (
-    <html lang="en">
-      <body className={`${sourceSans3.variable} font-sans antialiased`}>
+    <html lang="en" className="dark">
+      <body className={`${sourceSans3.variable} ${sourceSerif4.variable} font-sans antialiased`}>
         <AnalyticsProvider>
           <RecordingStateProvider>
             <TranscriptProvider>
@@ -256,14 +264,17 @@ function MainAppLayout({
                               <MeetingDetectedPrompt enabled={onboardingCompleted && !showOnboarding} />
 
                               {/* Show onboarding or main app */}
-                              {showOnboarding ? (
-                                <OnboardingFlow onComplete={handleOnboardingComplete} />
-                              ) : (
-                                <div className="flex">
-                                  <SimpleSidebar />
-                                  <MainContent>{children}</MainContent>
-                                </div>
-                              )}
+                              <ShellProvider>
+                                {showOnboarding ? (
+                                  <OnboardingFlow onComplete={handleOnboardingComplete} />
+                                ) : (
+                                  <div className="flex">
+                                    <SimpleSidebar />
+                                    <MainContent>{children}</MainContent>
+                                  </div>
+                                )}
+                                <ThemedToaster />
+                              </ShellProvider>
                               {/* Import audio overlay and dialog */}
                               <ImportDropOverlay visible={showDropOverlay} />
                               <ConditionalImportDialog
@@ -284,9 +295,6 @@ function MainAppLayout({
           </RecordingStateProvider>
         </AnalyticsProvider>
 
-        <Toaster position="bottom-center" richColors closeButton />
-        {/* Separate Toaster for top-right progress toasts (download, transcription queue) */}
-        <Toaster position="top-right" richColors />
       </body>
     </html>
   )

@@ -16,7 +16,7 @@ const BlockNotesEditor = dynamic(
   () => import('@/components/BlockNotesEditor').then((module) => module.BlockNotesEditor),
   {
     ssr: false,
-    loading: () => <div className="text-sm text-[#9b978d]">Opening notes…</div>,
+    loading: () => <div className="text-sm text-[var(--ink-subtle)]">Opening notes…</div>,
   },
 );
 
@@ -97,20 +97,20 @@ export function LiveNotesPad() {
   }, [scheduleSave]);
 
   if (!document) {
-    return <div className="flex h-full items-center justify-center text-sm text-gray-400">Preparing notes…</div>;
+    return <div className="flex h-full items-center justify-center text-sm text-ink-subtle">Preparing notes…</div>;
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#fbfaf7]">
+    <div className="flex h-full flex-col bg-[var(--surface-0)]">
       <div className="flex items-center justify-between px-8 py-4">
         <div>
-          <div className="text-sm font-medium text-[#272622]">Your notes</div>
-          <div className="text-xs text-[#8b887f]">Use / for blocks and Markdown · AI will enrich these after the meeting</div>
+          <div className="text-sm font-medium text-ink">Your notes</div>
+          <div className="text-xs text-[var(--ink-subtle)]">Use / for blocks and Markdown · AI will enrich these after the meeting</div>
         </div>
-        <span className="text-[11px] text-[#9b978d]">{saveState === 'saving' ? 'Saving…' : 'Saved'}</span>
+        <span className="text-[11px] text-[var(--ink-subtle)]">{saveState === 'saving' ? 'Saving…' : 'Saved'}</span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-36 pt-3">
-        <div className="mx-auto min-h-full max-w-[820px] rounded-2xl bg-white px-8 py-8 shadow-[0_1px_0_rgba(45,43,37,0.04)]">
+        <div className="mx-auto min-h-full max-w-[820px] rounded-2xl bg-[var(--surface-raised)] px-8 py-8 shadow-[0_1px_0_rgba(45,43,37,0.04)]">
           <BlockNotesEditor document={document} onChange={handleDocumentChange} />
         </div>
       </div>
