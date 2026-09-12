@@ -9,6 +9,7 @@ import { useConfig } from '@/contexts/ConfigContext';
 import { useTranscripts } from '@/contexts/TranscriptContext';
 import { useRecordingStop } from '@/hooks/useRecordingStop';
 import type { ModalType } from '@/hooks/useModalState';
+import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH, useShell } from '@/contexts/ShellContext';
 
 /**
  * In-meeting capture surface. Rendered on the meeting workspace while a recording
@@ -18,6 +19,7 @@ export function MeetingRecordingView({ onStopInitiated }: { onStopInitiated?: ()
   const recordingState = useRecordingState();
   const { selectedDevices } = useConfig();
   const { meetingTitle } = useTranscripts();
+  const { collapsed } = useShell();
 
   const { handleRecordingStop, isStopping } = useRecordingStop(
     () => {},
@@ -36,7 +38,10 @@ export function MeetingRecordingView({ onStopInitiated }: { onStopInitiated?: ()
         />
       </div>
 
-      <div className="pointer-events-none fixed bottom-8 left-[272px] right-0 z-10">
+      <div
+        className="pointer-events-none fixed bottom-8 right-0 z-10 transition-[left] duration-200"
+        style={{ left: collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
+      >
         <div className="flex justify-center">
           <div className="pointer-events-auto">
             <RecordingControls

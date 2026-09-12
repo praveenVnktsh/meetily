@@ -21,7 +21,7 @@ export function SummaryUpdaterButtonGroup({
           Analytics.trackButtonClick('copy_summary', 'meeting_details');
           onCopy();
         }}
-        className="h-8 cursor-pointer rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd]"
+        className="h-8 cursor-pointer rounded-full bg-[var(--surface-2)] px-3 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
       >
         <Copy className="h-3.5 w-3.5" />
         <span>Copy</span>

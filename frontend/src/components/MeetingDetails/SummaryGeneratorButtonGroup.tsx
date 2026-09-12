@@ -81,52 +81,7 @@ export function SummaryGeneratorButtonGroup({
   const selectedTemplateName = availableTemplates.find((template) => template.id === selectedTemplate)?.name ?? 'Template';
 
   return (
-    <div className="grid w-full grid-cols-2 gap-1.5 @[42rem]:flex @[42rem]:w-auto @[42rem]:items-center">
-      {/* Generate Summary or Stop button */}
-      {isGenerating ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#f4dfda] px-3 text-[#8a4138] hover:bg-[#edd1ca] @[42rem]:w-auto"
-          onClick={() => {
-            Analytics.trackButtonClick('stop_summary_generation', 'meeting_details');
-            onStopGeneration();
-          }}
-          title="Stop summary generation"
-        >
-          <Square size={18} fill="currentColor" />
-          <span className="hidden @[24rem]:inline">Stop</span>
-        </Button>
-      ) : (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#272622] px-3 text-white hover:bg-[#3b3934] hover:text-white @[42rem]:w-auto"
-          onClick={() => {
-            Analytics.trackButtonClick('generate_summary', 'meeting_details');
-            void onGenerateSummary(customPrompt);
-          }}
-          disabled={isModelConfigLoading}
-          title={
-            isModelConfigLoading
-              ? 'Loading model configuration...'
-              : hasSummary ? 'Regenerate AI Summary' : 'Generate AI Summary'
-          }
-        >
-          {isModelConfigLoading ? (
-            <>
-              <Loader2 className="animate-spin" size={18} />
-              <span>Working…</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={16} />
-              <span>{hasSummary ? 'Regenerate' : 'Generate'}</span>
-            </>
-          )}
-        </Button>
-      )}
-
+    <div className="flex flex-wrap items-center gap-1.5">
       {languageSlot}
 
       {/* Settings button */}
@@ -136,7 +91,7 @@ export function SummaryGeneratorButtonGroup({
             variant="ghost"
             size="sm"
             title="Summary Settings"
-            className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd] @[42rem]:w-auto @[42rem]:max-w-44"
+            className="h-8 max-w-44 shrink-0 gap-1.5 rounded-full border border-hairline px-3 text-xs text-ink-muted hover:bg-surface-2 hover:text-ink"
           >
             <Settings className="h-3.5 w-3.5" />
             <span className="max-w-32 truncate">{modelConfig.model || 'Choose model'}</span>
@@ -169,10 +124,10 @@ export function SummaryGeneratorButtonGroup({
               variant="ghost"
               size="sm"
               title="Select summary template"
-              className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd] @[42rem]:w-auto @[42rem]:max-w-40"
+              className="h-8 max-w-44 shrink-0 gap-1.5 rounded-full border border-hairline px-3 text-xs text-ink-muted hover:bg-surface-2 hover:text-ink"
             >
               <FileText className="h-3.5 w-3.5" />
-              <span className="max-w-28 truncate">{selectedTemplateName}</span>
+              <span className="max-w-32 truncate">{selectedTemplateName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">

@@ -6,7 +6,7 @@ import SimpleSidebar from '@/components/SimpleSidebar'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
 import MainContent from '@/components/MainContent'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
-import { Toaster, toast } from 'sonner'
+import { toast } from 'sonner'
 import "sonner/dist/styles.css"
 import { useState, useEffect, useCallback } from 'react'
 import { listen, UnlistenFn } from '@tauri-apps/api/event'
@@ -30,6 +30,7 @@ import { MeetingDetectedPrompt } from '@/components/MeetingDetectedPrompt'
 import { AutoSummaryProvider } from '@/components/AutoSummaryProvider'
 import { usePathname } from 'next/navigation'
 import { ShellProvider } from '@/contexts/ShellContext'
+import { ThemedToaster } from '@/components/ThemedToaster'
 
 
 const sourceSans3 = Source_Sans_3({
@@ -242,7 +243,7 @@ function MainAppLayout({
   }
 
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={`${sourceSans3.variable} ${sourceSerif4.variable} font-sans antialiased`}>
         <AnalyticsProvider>
           <RecordingStateProvider>
@@ -272,6 +273,7 @@ function MainAppLayout({
                                     <MainContent>{children}</MainContent>
                                   </div>
                                 )}
+                                <ThemedToaster />
                               </ShellProvider>
                               {/* Import audio overlay and dialog */}
                               <ImportDropOverlay visible={showDropOverlay} />
@@ -293,7 +295,6 @@ function MainAppLayout({
           </RecordingStateProvider>
         </AnalyticsProvider>
 
-        <Toaster position="bottom-center" richColors closeButton />
       </body>
     </html>
   )

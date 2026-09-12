@@ -103,7 +103,7 @@ export function HomebrewDatabaseDetector({ onImportSuccess, onDecline }: Homebre
           <p className="text-sm text-blue-800 mb-2">
             We found an existing database from your previous Meetily installation (Python backend version).
           </p>
-          <div className="bg-white/50 rounded p-2 mb-3">
+          <div className="bg-surface-raised rounded p-2 mb-3">
             <p className="text-xs text-blue-700 font-mono break-all">
               {detectedPath}
             </p>
@@ -138,7 +138,7 @@ export function HomebrewDatabaseDetector({ onImportSuccess, onDecline }: Homebre
             <button
               onClick={handleNo}
               disabled={isImporting}
-              className="flex-1 px-4 py-2 border-2 border-blue-400 text-blue-700 rounded-lg hover:bg-blue-100 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors"
+              className="flex-1 px-4 py-2 border-2 border-blue-400 text-blue-700 rounded-lg hover:bg-blue-100 disabled:bg-surface-2 disabled:cursor-not-allowed transition-colors"
             >
               No, Browse Manually
             </button>

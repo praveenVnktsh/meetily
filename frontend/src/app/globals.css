@@ -249,6 +249,35 @@
     border: none !important;
   }
 
+  /* Keep BlockNote documents on the app's serif document font */
+  .bn-container {
+    --bn-font-family: var(--font-source-serif-4), ui-serif, Georgia, Cambria, "Times New Roman", serif;
+    font-family: var(--bn-font-family);
+  }
+
+  .bn-default-styles {
+    font-family: var(--bn-font-family) !important;
+  }
+
+  /* Dark theme for BlockNote editors (menus, tooltips, text) */
+  .dark .bn-container {
+    --bn-colors-editor-text: #ededed;
+    --bn-colors-editor-background: transparent;
+    --bn-colors-menu-text: #ededed;
+    --bn-colors-menu-background: #232323;
+    --bn-colors-tooltip-text: #ededed;
+    --bn-colors-tooltip-background: #2a2a2a;
+    --bn-colors-hovered-text: #ededed;
+    --bn-colors-hovered-background: #2a2a2a;
+    --bn-colors-selected-text: #171717;
+    --bn-colors-selected-background: #ededed;
+    --bn-colors-disabled-text: #737373;
+    --bn-colors-disabled-background: #262626;
+    --bn-colors-side-menu: #737373;
+    --bn-colors-border: #2e2e2e;
+    --bn-colors-shadow: #000000;
+  }
+
   /* Disable scrolling on any BlockNote wrapper elements */
   [data-node-type] {
     overflow: visible !important;

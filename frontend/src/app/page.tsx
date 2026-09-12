@@ -15,6 +15,7 @@ import { useModalState } from '@/hooks/useModalState';
 import { useRecordingStateSync } from '@/hooks/useRecordingStateSync';
 import { useRecordingStart } from '@/hooks/useRecordingStart';
 import { useRecordingStop } from '@/hooks/useRecordingStop';
+import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH, useShell } from '@/contexts/ShellContext';
 import { useTranscriptRecovery } from '@/hooks/useTranscriptRecovery';
 import { TranscriptRecovery } from '@/components/TranscriptRecovery';
 import { indexedDBService } from '@/services/indexedDBService';
@@ -37,7 +38,8 @@ export default function Home() {
 
   // Hooks
   const { hasMicrophone } = usePermissionCheck();
-  const { setIsMeetingActive, isCollapsed: sidebarCollapsed, refetchMeetings } = useSidebar();
+  const { setIsMeetingActive, refetchMeetings } = useSidebar();
+  const { collapsed: sidebarCollapsed } = useShell();
   const { modals, messages, showModal, hideModal } = useModalState(transcriptModelConfig);
   const { isRecordingDisabled, setIsRecordingDisabled } = useRecordingStateSync(isRecording, setIsRecordingState, setIsMeetingActive);
   const { handleRecordingStart } = useRecordingStart(isRecording, setIsRecordingState, showModal);
@@ -189,7 +191,7 @@ export default function Home() {
   const isProcessingStop = status === RecordingStatus.PROCESSING_TRANSCRIPTS || isProcessing;
 
   return (
-    <div className="flex h-screen flex-col bg-[#fbfaf7]">
+    <div className="flex h-screen flex-col bg-[var(--surface-0)]">
       {/* All Modals supported*/}
       <SettingsModals
         modals={modals}
@@ -217,7 +219,10 @@ export default function Home() {
         {(hasMicrophone || isRecording) &&
           status !== RecordingStatus.PROCESSING_TRANSCRIPTS &&
           status !== RecordingStatus.SAVING && (
-            <div className="fixed bottom-8 left-[272px] right-0 z-10">
+            <div
+              className="fixed bottom-8 right-0 z-10 transition-[left] duration-200"
+              style={{ left: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
+            >
               <div
                 className="flex justify-center"
               >

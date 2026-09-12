@@ -1,16 +1,20 @@
 "use client";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { MeetingSummary, SummaryProcessResponse } from '@/types';
 import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import Analytics from '@/lib/analytics';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MoreHorizontal } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { parseSummaryContent, readSummaryMetadata } from '@/lib/summary-content';
 import { TranscriptPanel } from '@/components/MeetingDetails/TranscriptPanel';
 import { SummaryPanel } from '@/components/MeetingDetails/SummaryPanel';
-import { MeetingDetailsSplitView, type MeetingRightView } from '@/components/MeetingDetails/MeetingDetailsSplitView';
+import { SummaryGeneratorButtonGroup } from '@/components/MeetingDetails/SummaryGeneratorButtonGroup';
+import { SummaryUpdaterButtonGroup } from '@/components/MeetingDetails/SummaryUpdaterButtonGroup';
+import { SummaryLanguagePill } from '@/components/MeetingDetails/SummaryLanguagePill';
+import { MeetingWorkspace, type NotesMode } from '@/components/MeetingDetails/MeetingWorkspace';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { MeetingAssistantPanel } from '@/components/MeetingDetails/MeetingAssistantPanel';
 import { MeetingRawNotesEditor } from '@/components/MeetingDetails/MeetingRawNotesEditor';
@@ -73,7 +77,7 @@ export default function PageContent({
   // State
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const isRecording = false;
-  const [rightView, setRightView] = useState<MeetingRightView>(summaryData ? 'summary' : 'transcript');
+  const [notesMode, setNotesMode] = useState<NotesMode>(summaryData ? 'enhanced' : 'raw');
   const [phase, setPhase] = useState<WorkspacePhase>(() =>
     arrivedRecording || arrivedTranscribing ? 'transcribing' : expectSummary ? 'summarizing' : 'ready'
   );
@@ -100,6 +104,17 @@ export default function PageContent({
   // Keep the latest title updater without restarting the summary watcher below.
   const updateMeetingTitleRef = useRef(meetingData.updateMeetingTitle);
   updateMeetingTitleRef.current = meetingData.updateMeetingTitle;
+
+  // Persist an inline title edit and keep the sidebar in sync.
+  const handleTitleChange = useCallback((nextTitle: string) => {
+    const trimmed = nextTitle.trim();
+    if (!trimmed || trimmed === meetingData.meetingTitle) return;
+    meetingData.updateMeetingTitle(trimmed);
+    void invoke('api_save_meeting_title', { meetingId: meeting.id, title: trimmed }).catch((error) => {
+      console.warn('Could not rename meeting:', error);
+      toast.error('Could not rename the meeting');
+    });
+  }, [meeting.id, meetingData.meetingTitle, meetingData.updateMeetingTitle]);
 
   // Callback to register the modal open function
   const handleRegisterModalOpen = (openFn: () => void) => {
@@ -258,18 +273,63 @@ export default function PageContent({
   const isSummaryActive = summaryGeneration.summaryStatus === 'processing'
     || summaryGeneration.summaryStatus === 'summarizing'
     || summaryGeneration.summaryStatus === 'regenerating';
-  const showSummary = Boolean(meetingData.aiSummary) || summaryGeneration.summaryStatus === 'completed';
-  const showAssistant = phase === 'ready';
-  const effectiveRightView: MeetingRightView = rightView === 'summary' && !showSummary
-    ? 'transcript'
-    : rightView === 'assistant' && !showAssistant
-      ? 'transcript'
-      : rightView;
+  const canShowEnhanced = Boolean(meetingData.aiSummary) || summaryGeneration.summaryStatus === 'completed';
+  const showAssistant = true;
+  const effectiveNotesMode: NotesMode = notesMode === 'enhanced' && !canShowEnhanced ? 'raw' : notesMode;
+  const peopleCount = new Set(
+    meetingData.transcripts.map((t: any) => t.speaker_id ?? t.speaker).filter(Boolean)
+  ).size;
   const statusBanner = phase === 'summarizing' || isSummaryActive ? (
-    <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-[#efede7] px-3 py-1.5 text-[11px] font-medium text-[#5d5a53]">
+    <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-surface-2 px-3 py-1.5 text-[11px] font-medium text-ink-muted">
       <Loader2 className="h-3.5 w-3.5 animate-spin" /> Generating summary…
     </span>
   ) : null;
+
+  const summaryToolbarActions = (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          title="Summary options"
+          aria-label="Summary options"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-hairline text-ink-muted hover:bg-surface-2 hover:text-ink"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-[340px] space-y-3 p-3">
+        <div className="flex items-center gap-2 text-[11px] text-ink-subtle">
+          <span>{new Date(meeting.created_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+          {peopleCount > 0 && (
+            <>
+              <span>·</span>
+              <span>{peopleCount} {peopleCount === 1 ? 'person' : 'people'}</span>
+            </>
+          )}
+        </div>
+        <SummaryGeneratorButtonGroup
+          modelConfig={modelConfig}
+          setModelConfig={setModelConfig}
+          onSaveModelConfig={handleSaveModelConfig}
+          onGenerateSummary={summaryGeneration.handleGenerateSummary}
+          onStopGeneration={summaryGeneration.handleStopGeneration}
+          customPrompt={customPrompt}
+          summaryStatus={summaryGeneration.summaryStatus}
+          availableTemplates={templates.availableTemplates}
+          selectedTemplate={templates.selectedTemplate}
+          onTemplateSelect={templates.handleTemplateSelection}
+          hasTranscripts={meetingData.transcripts.length > 0}
+          hasSummary={canShowEnhanced}
+          isModelConfigLoading={isModelConfigLoading}
+          onOpenModelSettings={handleRegisterModalOpen}
+          languageSlot={<SummaryLanguagePill meetingId={meeting.id} />}
+        />
+        {canShowEnhanced && (
+          <SummaryUpdaterButtonGroup onCopy={copyOperations.handleCopySummary} />
+        )}
+      </PopoverContent>
+    </Popover>
+  );
 
   // Track page view
   useEffect(() => {
@@ -283,7 +343,7 @@ export default function PageContent({
       && !manuallySelectedViewMeetingIdsRef.current.has(meeting.id)
     ) {
       autoSwitchedSummaryMeetingIdsRef.current.add(meeting.id);
-      setRightView('summary');
+      setNotesMode('enhanced');
     }
   }, [meeting.id, meetingData.aiSummary, summaryGeneration.summaryStatus]);
 
@@ -321,7 +381,7 @@ export default function PageContent({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="flex h-screen min-w-0 flex-col bg-[#fbfaf7]"
+        className="flex h-screen min-w-0 flex-col bg-[var(--surface-0)]"
       >
         <MeetingRecordingView onStopInitiated={() => setPhase('transcribing')} />
       </motion.div>
@@ -333,20 +393,26 @@ export default function PageContent({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="flex h-screen min-w-0 flex-col bg-[#fbfaf7]"
+      className="flex h-screen min-w-0 flex-col bg-[var(--surface-0)]"
     >
       <div className="flex flex-1 min-w-0 overflow-hidden">
-        <MeetingDetailsSplitView
+        <MeetingWorkspace
           title={meetingData.meetingTitle}
           createdAt={meeting.created_at}
-          rightView={effectiveRightView}
-          onRightViewChange={(view) => {
+          notesMode={effectiveNotesMode}
+          onNotesModeChange={(mode) => {
             manuallySelectedViewMeetingIdsRef.current.add(meeting.id);
-            setRightView(view);
+            setNotesMode(mode);
           }}
-          showSummary={showSummary}
+          canShowEnhanced={canShowEnhanced}
           showAssistant={showAssistant}
+          peopleCount={peopleCount}
           statusBanner={statusBanner}
+          toolbarActions={summaryToolbarActions}
+          onTitleChange={handleTitleChange}
+          onRegenerate={summaryGeneration.handleRegenerateSummary}
+          onStopGeneration={summaryGeneration.handleStopGeneration}
+          isGenerating={isSummaryActive}
           transcript={
             <TranscriptPanel
               transcripts={meetingData.transcripts}
@@ -377,7 +443,7 @@ export default function PageContent({
               onSaveModelConfig={handleSaveModelConfig}
               onNotesUpdated={(markdown) => {
                 meetingData.setAiSummary({ markdown });
-                setRightView('summary');
+                setNotesMode('enhanced');
               }}
               onTranscriptUpdated={onRefetchTranscripts}
             />

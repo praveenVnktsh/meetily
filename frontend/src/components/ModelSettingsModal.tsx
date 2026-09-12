@@ -1277,14 +1277,14 @@ export function ModelSettingsModal({
 
                         {/* Show progress for gemma3:1b download */}
                         {isDownloading('gemma3:1b') && getProgress('gemma3:1b') !== undefined && (
-                          <div className="bg-white rounded-md border p-3">
+                          <div className="bg-surface-raised rounded-md border p-3">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-blue-600">Downloading gemma3:1b</span>
                               <span className="text-sm font-semibold text-blue-600">
                                 {Math.round(getProgress('gemma3:1b')!)}%
                               </span>
                             </div>
-                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                            <div className="w-full h-2 bg-surface-2 rounded-full overflow-hidden">
                               <div
                                 className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-300"
                                 style={{ width: `${getProgress('gemma3:1b')}%` }}
@@ -1335,12 +1335,12 @@ export function ModelSettingsModal({
 
                           {/* Progress bar for downloading models */}
                           {modelIsDownloading && progress !== undefined && (
-                            <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="mt-3 pt-3 border-t border-hairline">
                               <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-medium text-blue-600">Downloading...</span>
                                 <span className="text-sm font-semibold text-blue-600">{Math.round(progress)}%</span>
                               </div>
-                              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div className="w-full h-2 bg-surface-2 rounded-full overflow-hidden">
                                 <div
                                   className="h-full bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-300"
                                   style={{ width: `${progress}%` }}
@@ -1373,7 +1373,7 @@ export function ModelSettingsModal({
       </div>
 
       {/* Auto-generate summaries toggle */}
-      {/* <div className="mt-6 pt-6 border-t border-gray-200">
+      {/* <div className="mt-6 pt-6 border-t border-hairline">
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <Label htmlFor="auto-generate" className="text-base font-medium">

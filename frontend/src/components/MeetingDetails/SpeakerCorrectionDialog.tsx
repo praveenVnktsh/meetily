@@ -89,23 +89,23 @@ export function SpeakerCorrectionDialog({
         </DialogHeader>
 
         {speakers.length === 0 ? (
-          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-gray-500">
+          <div className="rounded-lg border border-dashed p-6 text-center text-sm text-ink-muted">
             Identify speakers first, then return here to name and correct them.
           </div>
         ) : (
           <div className="space-y-3">
             {speakers.map((speaker) => (
-              <div key={speaker.speaker_id} className="rounded-lg border border-gray-200 p-3">
+              <div key={speaker.speaker_id} className="rounded-lg border border-hairline p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <div>
-                    <div className="font-mono text-xs text-gray-500">{speaker.speaker_id}</div>
-                    <div className="text-xs text-gray-400">{speaker.segment_count} segments</div>
+                    <div className="font-mono text-xs text-ink-muted">{speaker.speaker_id}</div>
+                    <div className="text-xs text-ink-subtle">{speaker.segment_count} segments</div>
                   </div>
                   <div className="flex flex-1 items-center gap-2">
                     <input
                       value={names[speaker.speaker_id] ?? speaker.display_name}
                       onChange={(event) => setNames((current) => ({ ...current, [speaker.speaker_id]: event.target.value }))}
-                      className="h-9 min-w-0 flex-1 rounded-md border border-gray-200 px-3 text-sm focus:border-blue-400 focus:outline-none"
+                      className="h-9 min-w-0 flex-1 rounded-md border border-hairline px-3 text-sm focus:border-blue-400 focus:outline-none"
                       aria-label={`Name for ${speaker.speaker_id}`}
                     />
                     <Button
@@ -119,12 +119,12 @@ export function SpeakerCorrectionDialog({
                   </div>
                 </div>
                 {speakers.length > 1 && (
-                  <div className="flex items-center gap-2 border-t border-gray-100 pt-2">
-                    <span className="text-xs text-gray-500">Merge into</span>
+                  <div className="flex items-center gap-2 border-t border-hairline pt-2">
+                    <span className="text-xs text-ink-muted">Merge into</span>
                     <select
                       value={mergeTargets[speaker.speaker_id] || ''}
                       onChange={(event) => setMergeTargets((current) => ({ ...current, [speaker.speaker_id]: event.target.value }))}
-                      className="h-8 min-w-0 flex-1 rounded-md border border-gray-200 px-2 text-sm"
+                      className="h-8 min-w-0 flex-1 rounded-md border border-hairline px-2 text-sm"
                     >
                       <option value="">Choose a speaker…</option>
                       {speakers.filter((item) => item.speaker_id !== speaker.speaker_id).map((item) => (

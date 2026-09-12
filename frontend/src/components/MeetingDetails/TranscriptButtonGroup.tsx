@@ -82,7 +82,7 @@ export function TranscriptButtonGroup({
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd]"
+          className="h-8 rounded-full bg-[var(--surface-2)] px-3 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
           onClick={() => {
             Analytics.trackButtonClick('copy_transcript', 'meeting_details');
             onCopyTranscript();
@@ -97,7 +97,7 @@ export function TranscriptButtonGroup({
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd]"
+          className="h-8 rounded-full bg-[var(--surface-2)] px-3 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
           onClick={() => {
             Analytics.trackButtonClick('open_recording_folder', 'meeting_details');
             onOpenMeetingFolder();
@@ -110,7 +110,7 @@ export function TranscriptButtonGroup({
 
         {hasMoreActions && <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost" className="h-8 rounded-full bg-[#efede7] px-2.5 text-[#5d5a53] hover:bg-[#e7e4dd]" title="More transcript actions" aria-label="More transcript actions">
+            <Button size="sm" variant="ghost" className="h-8 rounded-full bg-[var(--surface-2)] px-2.5 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]" title="More transcript actions" aria-label="More transcript actions">
               <MoreHorizontal size={18} />
             </Button>
           </DropdownMenuTrigger>

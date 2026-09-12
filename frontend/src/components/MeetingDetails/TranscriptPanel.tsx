@@ -6,7 +6,7 @@ import { TranscriptButtonGroup } from './TranscriptButtonGroup';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search, X } from 'lucide-react';
 import { SpeakerCorrectionDialog, SpeakerIdentity } from './SpeakerCorrectionDialog';
 
 interface TranscriptPanelProps {
@@ -54,6 +54,7 @@ export function TranscriptPanel({
 }: TranscriptPanelProps) {
   const [showSpeakerDialog, setShowSpeakerDialog] = useState(false);
   const [speakerOptions, setSpeakerOptions] = useState<SpeakerIdentity[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const refreshSpeakers = useCallback(async () => {
     if (!meetingId) return;
@@ -97,10 +98,16 @@ export function TranscriptPanel({
     }));
   }, [transcripts, usePagination, segments]);
 
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const displaySegments = useMemo(() => {
+    if (!normalizedQuery) return convertedSegments;
+    return convertedSegments.filter((segment) => segment.text.toLowerCase().includes(normalizedQuery));
+  }, [convertedSegments, normalizedQuery]);
+
   return (
-    <div className="flex h-full min-w-0 w-full bg-[#fbfaf7] flex-col relative @container">
+    <div className="flex h-full min-w-0 w-full bg-[var(--surface-0)] flex-col relative @container">
       {/* Title area */}
-      <div className="mx-auto w-full max-w-[900px] px-8 py-3">
+      <div className="mx-auto w-full max-w-[900px] px-8 pb-2 pt-4">
         <TranscriptButtonGroup
           transcriptCount={usePagination ? (totalCount ?? convertedSegments.length) : (transcripts?.length || 0)}
           onCopyTranscript={onCopyTranscript}
@@ -111,24 +118,47 @@ export function TranscriptPanel({
           onOpenSpeakerManager={() => setShowSpeakerDialog(true)}
           locked={locked}
         />
+        <div className="relative mt-3">
+          <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-subtle)]" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search transcript…"
+            className="h-9 w-full rounded-xl border border-hairline bg-[var(--surface-1)] pl-9 pr-9 text-sm text-ink outline-none placeholder:text-[var(--ink-subtle)] focus:border-[var(--ink-subtle)]"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-1 text-[var(--ink-subtle)] hover:bg-[var(--surface-2)]"
+              aria-label="Clear transcript search"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
         {locked && convertedSegments.length > 0 && (
-          <p className="mt-2 text-[11px] text-[#9b978d]">Transcript is locked while the summary is being generated.</p>
+          <p className="mt-2 text-[11px] text-[var(--ink-subtle)]">Transcript is locked while the summary is being generated.</p>
         )}
       </div>
 
       {/* Transcript content - use virtualized view for better performance */}
       {isTranscribing && convertedSegments.length === 0 ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-16 text-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#8b887f]" />
+          <Loader2 className="h-6 w-6 animate-spin text-[var(--ink-subtle)]" />
           <div>
-            <p className="text-sm font-medium text-[#5d5a53]">Transcribing meeting audio…</p>
-            <p className="mt-1 text-xs text-[#9b978d]">This can take a moment. Your notes are safe and stay editable meanwhile.</p>
+            <p className="text-sm font-medium text-[var(--ink-muted)]">Transcribing meeting audio…</p>
+            <p className="mt-1 text-xs text-[var(--ink-subtle)]">This can take a moment. Your notes are safe and stay editable meanwhile.</p>
           </div>
+        </div>
+      ) : normalizedQuery && displaySegments.length === 0 ? (
+        <div className="flex flex-1 items-center justify-center px-8 pb-16 text-center text-sm text-[var(--ink-subtle)]">
+          No transcript matches “{searchQuery.trim()}”.
         </div>
       ) : (
         <div className="mx-auto w-full max-w-[900px] flex-1 overflow-hidden pb-4">
           <VirtualizedTranscriptView
-            segments={convertedSegments}
+            segments={displaySegments}
             isRecording={isRecording}
             isPaused={false}
             isProcessing={false}

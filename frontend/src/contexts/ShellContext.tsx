@@ -1,11 +1,14 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 type Theme = 'light' | 'dark';
 
 const COLLAPSED_KEY = 'meetily:sidebar-collapsed';
 const THEME_KEY = 'meetily:theme';
+
+/** Below this viewport width the app switches to a compact, collapsed layout. */
+export const COMPACT_BREAKPOINT = 1024;
 
 interface ShellContextValue {
   collapsed: boolean;
@@ -14,6 +17,8 @@ interface ShellContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;
+  /** True when the window is narrow; the sidebar auto-collapses and docks stack. */
+  compact: boolean;
 }
 
 const ShellContext = createContext<ShellContextValue | null>(null);
@@ -23,15 +28,25 @@ export const SIDEBAR_COLLAPSED_WIDTH = 72;
 
 export function ShellProvider({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsedState] = useState(false);
-  // Phase 1 ships light-default; Phase 2 migrates the workspace to tokens and
-  // flips the default to dark. The toggle is already wired for both.
-  const [theme, setThemeState] = useState<Theme>('light');
+  const [theme, setThemeState] = useState<Theme>('dark');
+  const [compact, setCompact] = useState(false);
+  // Remembers the user's own collapse choice so leaving compact mode restores it.
+  const userCollapsedRef = useRef(false);
 
   useEffect(() => {
-    const storedCollapsed = localStorage.getItem(COLLAPSED_KEY);
-    if (storedCollapsed != null) setCollapsedState(storedCollapsed === 'true');
+    const storedCollapsed = localStorage.getItem(COLLAPSED_KEY) === 'true';
+    userCollapsedRef.current = storedCollapsed;
     const storedTheme = localStorage.getItem(THEME_KEY);
     if (storedTheme === 'light' || storedTheme === 'dark') setThemeState(storedTheme);
+
+    const applyViewport = () => {
+      const isCompact = window.innerWidth < COMPACT_BREAKPOINT;
+      setCompact(isCompact);
+      setCollapsedState(isCompact ? true : userCollapsedRef.current);
+    };
+    applyViewport();
+    window.addEventListener('resize', applyViewport);
+    return () => window.removeEventListener('resize', applyViewport);
   }, []);
 
   useEffect(() => {
@@ -39,14 +54,17 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
   }, [theme]);
 
   const setCollapsed = useCallback((value: boolean) => {
+    userCollapsedRef.current = value;
     setCollapsedState(value);
     localStorage.setItem(COLLAPSED_KEY, String(value));
   }, []);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsedState((current) => {
-      localStorage.setItem(COLLAPSED_KEY, String(!current));
-      return !current;
+      const next = !current;
+      userCollapsedRef.current = next;
+      localStorage.setItem(COLLAPSED_KEY, String(next));
+      return next;
     });
   }, []);
 
@@ -64,7 +82,7 @@ export function ShellProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <ShellContext.Provider value={{ collapsed, setCollapsed, toggleCollapsed, theme, setTheme, toggleTheme }}>
+    <ShellContext.Provider value={{ collapsed, setCollapsed, toggleCollapsed, theme, setTheme, toggleTheme, compact }}>
       {children}
     </ShellContext.Provider>
   );

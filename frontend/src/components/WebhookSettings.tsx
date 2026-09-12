@@ -73,23 +73,23 @@ export function WebhookSettings() {
   };
 
   if (loading) {
-    return <div className="mt-6 h-40 animate-pulse rounded-lg bg-gray-100" />;
+    return <div className="mt-6 h-40 animate-pulse rounded-lg bg-surface-2" />;
   }
 
   return (
     <div className="mt-6 max-w-3xl space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Transcription webhook</h2>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-ink-muted">
           Notify your integration only after a meeting transcript has been finalized. Recording
           completion alone never sends a webhook.
         </p>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border bg-white p-4">
+      <div className="flex items-center justify-between rounded-lg border bg-surface-raised p-4">
         <div className="pr-4">
           <div className="font-medium">Enable completion webhook</div>
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-ink-muted">
             Failed deliveries remain in a local outbox and retry automatically.
           </div>
         </div>
@@ -107,9 +107,9 @@ export function WebhookSettings() {
           value={config.endpoint}
           onChange={event => setConfig(current => ({ ...current, endpoint: event.target.value }))}
           placeholder="https://hooks.example.com/meetily"
-          className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+          className="w-full rounded-md border border-hairline bg-surface-raised px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
-        <p className="text-xs text-gray-500">HTTPS is required, except for localhost development.</p>
+        <p className="text-xs text-ink-muted">HTTPS is required, except for localhost development.</p>
       </div>
 
       <div className="space-y-2">
@@ -121,7 +121,7 @@ export function WebhookSettings() {
             value={config.signing_secret}
             onChange={event => setConfig(current => ({ ...current, signing_secret: event.target.value }))}
             placeholder="At least 16 characters"
-            className="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="min-w-0 flex-1 rounded-md border border-hairline bg-surface-raised px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
           />
           <Button variant="outline" onClick={generateSecret} title="Generate secret">
             <RefreshCw className="h-4 w-4" />
@@ -135,12 +135,12 @@ export function WebhookSettings() {
             <Copy className="h-4 w-4" />
           </Button>
         </div>
-        <p className="text-xs text-gray-500">
+        <p className="text-xs text-ink-muted">
           Verify the <code>x-meetily-signature</code> HMAC-SHA256 header in your receiver.
         </p>
       </div>
 
-      <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700">
+      <div className="rounded-lg border bg-surface-2 p-4 text-sm text-ink">
         Payloads contain meeting metadata and a Meetily path, but no transcript or audio. Calendar
         and external-ledger IDs are reserved as nullable fields for the later integration.
       </div>

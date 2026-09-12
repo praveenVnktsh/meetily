@@ -104,27 +104,27 @@ export function TranscriptPanel({
   );
 
   return (
-    <div ref={transcriptContainerRef} className="flex h-full w-full flex-col overflow-hidden bg-[#fbfaf7] text-[#272622]">
+    <div ref={transcriptContainerRef} className="flex h-full w-full flex-col overflow-hidden bg-[var(--surface-0)] text-ink">
       {isRecording ? (
-        <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e5e2da] bg-[#fbfaf7] px-8">
+        <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[var(--hairline)] bg-[var(--surface-0)] px-8">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#a34436]">
               <span className="h-2 w-2 animate-pulse rounded-full bg-[#d74d3f]" /> Recording
             </div>
             <h1 className="mt-1 truncate text-lg font-semibold tracking-[-0.02em]">{meetingTitle.replace(/^\+\s*/, '')}</h1>
           </div>
-          <div className="flex rounded-xl bg-[#efede7] p-1">
-            <button type="button" onClick={() => setRecordingView('notes')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${recordingView === 'notes' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
+          <div className="flex rounded-xl bg-[var(--surface-2)] p-1">
+            <button type="button" onClick={() => setRecordingView('notes')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${recordingView === 'notes' ? 'bg-[var(--surface-raised)] text-ink shadow-sm' : 'text-[var(--ink-muted)]'}`}>
               <PencilLine className="h-3.5 w-3.5" /> Notes
             </button>
-            <button type="button" onClick={() => setRecordingView('transcript')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${recordingView === 'transcript' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
+            <button type="button" onClick={() => setRecordingView('transcript')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${recordingView === 'transcript' ? 'bg-[var(--surface-raised)] text-ink shadow-sm' : 'text-[var(--ink-muted)]'}`}>
               <FileText className="h-3.5 w-3.5" /> Transcript
             </button>
           </div>
         </header>
       ) : (
         <header className="flex h-[76px] shrink-0 items-center justify-end px-8">
-          <div className="flex items-center gap-3 text-xs text-[#77736a]">
+          <div className="flex items-center gap-3 text-xs text-[var(--ink-muted)]">
             {transcriptModelConfig.provider === 'localWhisper' && (
               <button type="button" onClick={() => showModal('languageSettings')} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 hover:bg-black/5">
                 <GlobeIcon className="h-3.5 w-3.5" /> Language
@@ -163,18 +163,18 @@ export function TranscriptPanel({
             <div className="mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#e7eee5] text-[#55735c]">
               <PencilLine className="h-7 w-7" />
             </div>
-            <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-[#272622]">Ready for your next meeting</h1>
-            <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-[#77736a]">Start once, stay present, and jot only what matters. Meetily records quietly and turns the conversation into useful notes afterward.</p>
-            <p className="mt-7 text-xs text-[#aaa69b]">Live transcription is off by default · audio stays on this Mac</p>
+            <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-ink">Ready for your next meeting</h1>
+            <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-[var(--ink-muted)]">Start once, stay present, and jot only what matters. Meetily records quietly and turns the conversation into useful notes afterward.</p>
+            <p className="mt-7 text-xs text-[var(--ink-subtle)]">Live transcription is off by default · audio stays on this Mac</p>
           </div>
         </div>
       ) : (
       <div className="min-h-0 flex-1 pb-20">
         {isRecording && (!showLiveTranscriptToggle || !liveTranscriptEnabled) ? (
           <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
-            <FileText className="h-7 w-7 text-[#aaa69b]" />
-            <p className="text-sm font-medium text-[#5d5a53]">Transcript will appear after the meeting</p>
-            <p className="text-xs text-[#9b978d]">Your recording is safe. Return to Notes to keep writing.</p>
+            <FileText className="h-7 w-7 text-[var(--ink-subtle)]" />
+            <p className="text-sm font-medium text-[var(--ink-muted)]">Transcript will appear after the meeting</p>
+            <p className="text-xs text-[var(--ink-subtle)]">Your recording is safe. Return to Notes to keep writing.</p>
           </div>
         ) : (
           <div className="flex justify-center">
