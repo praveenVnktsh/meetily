@@ -1,17 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { invoke } from '@tauri-apps/api/core';
-import { Bookmark, Plus, Star } from 'lucide-react';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 import {
   createLiveNote,
-  formatNoteTimestamp,
   LIVE_NOTES_FALLBACK_KEY,
   LIVE_NOTES_FALLBACK_FOLDER_KEY,
   type LiveNote,
   type LiveNotesDocument,
 } from '@/lib/liveNotes';
+
+const BlockNotesEditor = dynamic(
+  () => import('@/components/BlockNotesEditor').then((module) => module.BlockNotesEditor),
+  {
+    ssr: false,
+    loading: () => <div className="text-sm text-[#9b978d]">Opening notes…</div>,
+  },
+);
 
 function storedFallback(folderPath: string | null): LiveNotesDocument | null {
   try {
@@ -28,7 +35,6 @@ export function LiveNotesPad() {
   const [document, setDocument] = useState<LiveNotesDocument | null>(null);
   const [folderPath, setFolderPath] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'saved' | 'saving'>('saved');
-  const textareas = useRef(new Map<string, HTMLTextAreaElement>());
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
   const durationRef = useRef(0);
   durationRef.current = recordingDuration ?? 0;
@@ -85,92 +91,27 @@ export function LiveNotesPad() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
 
-  const update = useCallback((updater: (current: LiveNotesDocument) => LiveNotesDocument) => {
-    setDocument((current) => {
-      if (!current) return current;
-      const next = { ...updater(current), updatedAt: new Date().toISOString() };
-      scheduleSave(next);
-      return next;
-    });
+  const handleDocumentChange = useCallback((next: LiveNotesDocument) => {
+    setDocument(next);
+    scheduleSave(next);
   }, [scheduleSave]);
-
-  const addNote = useCallback((important = false) => {
-    const note = { ...createLiveNote(durationRef.current), important };
-    update((current) => ({ ...current, notes: [...current.notes, note] }));
-    requestAnimationFrame(() => textareas.current.get(note.id)?.focus());
-  }, [update]);
 
   if (!document) {
     return <div className="flex h-full items-center justify-center text-sm text-gray-400">Preparing notes…</div>;
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#fcfbf8]">
-      <div className="flex items-center justify-between border-b border-stone-200 px-6 py-3">
+    <div className="flex h-full flex-col bg-[#fbfaf7]">
+      <div className="flex items-center justify-between px-8 py-4">
         <div>
-          <div className="text-sm font-medium text-stone-800">Live notes</div>
-          <div className="text-xs text-stone-400">Saved automatically · timestamps follow the recording</div>
+          <div className="text-sm font-medium text-[#272622]">Your notes</div>
+          <div className="text-xs text-[#8b887f]">Use / for blocks and Markdown · AI will enrich these after the meeting</div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-stone-400">{saveState === 'saving' ? 'Saving…' : 'Saved'}</span>
-          <button
-            type="button"
-            onClick={() => addNote(true)}
-            className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100"
-            title="Mark an important moment"
-          >
-            <Bookmark className="h-3.5 w-3.5" /> Mark moment
-          </button>
-        </div>
+        <span className="text-[11px] text-[#9b978d]">{saveState === 'saving' ? 'Saving…' : 'Saved'}</span>
       </div>
-      <div className="flex-1 overflow-y-auto px-6 pb-36 pt-5">
-        <div className="mx-auto max-w-3xl space-y-4">
-          {document.notes.map((note) => (
-            <div key={note.id} className="group flex items-start gap-3">
-              <button
-                type="button"
-                onClick={() => update((current) => ({
-                  ...current,
-                  notes: current.notes.map((item) => item.id === note.id ? { ...item, important: !item.important } : item),
-                }))}
-                className={`mt-1 flex min-w-[58px] items-center gap-1 rounded px-1.5 py-1 font-mono text-xs ${note.important ? 'bg-amber-100 text-amber-800' : 'text-stone-400 hover:bg-stone-100'}`}
-                title={note.important ? 'Remove important mark' : 'Mark important'}
-              >
-                {note.important && <Star className="h-3 w-3 fill-current" />}
-                {formatNoteTimestamp(note.timestampSeconds)}
-              </button>
-              <textarea
-                ref={(element) => {
-                  if (element) textareas.current.set(note.id, element);
-                  else textareas.current.delete(note.id);
-                }}
-                value={note.text}
-                rows={1}
-                autoFocus={document.notes.length === 1}
-                placeholder="Type a note…"
-                onChange={(event) => {
-                  event.currentTarget.style.height = 'auto';
-                  event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
-                  const text = event.target.value;
-                  update((current) => ({
-                    ...current,
-                    notes: current.notes.map((item) => item.id === note.id ? { ...item, text } : item),
-                  }));
-                }}
-                onBlur={() => void persist(document, folderPath)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    addNote(event.metaKey || event.ctrlKey);
-                  }
-                }}
-                className="min-h-[34px] flex-1 resize-none overflow-hidden border-0 bg-transparent py-1 text-[15px] leading-6 text-stone-800 outline-none placeholder:text-stone-300"
-              />
-            </div>
-          ))}
-          <button type="button" onClick={() => addNote()} className="ml-[70px] inline-flex items-center gap-1.5 text-sm text-stone-400 hover:text-stone-700">
-            <Plus className="h-4 w-4" /> Add note
-          </button>
+      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-36 pt-3">
+        <div className="mx-auto min-h-full max-w-[820px] rounded-2xl bg-white px-8 py-8 shadow-[0_1px_0_rgba(45,43,37,0.04)]">
+          <BlockNotesEditor document={document} onChange={handleDocumentChange} />
         </div>
       </div>
     </div>

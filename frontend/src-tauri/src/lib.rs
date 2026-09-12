@@ -48,6 +48,7 @@ pub mod openai;
 pub mod anthropic;
 pub mod groq;
 pub mod live_notes;
+pub mod meeting_assistant;
 pub mod openrouter;
 pub mod parakeet_engine;
 pub mod state;
@@ -712,6 +713,9 @@ pub fn run() {
             live_notes::load_live_notes,
             live_notes::attach_live_notes,
             live_notes::get_meeting_live_notes,
+            live_notes::save_meeting_live_notes,
+            meeting_assistant::get_meeting_chat,
+            meeting_assistant::chat_with_meeting,
             // Reload sync commands (retrieve transcript history and meeting name)
             audio::recording_commands::get_transcript_history,
             audio::recording_commands::get_recording_meeting_name,

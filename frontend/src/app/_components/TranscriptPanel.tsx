@@ -1,7 +1,6 @@
 import { VirtualizedTranscriptView } from '@/components/VirtualizedTranscriptView';
 import { PermissionWarning } from '@/components/PermissionWarning';
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import { Switch } from '@/components/ui/switch';
 import { Copy, FileText, GlobeIcon, PencilLine } from 'lucide-react';
 import { useTranscripts } from '@/contexts/TranscriptContext';
@@ -39,7 +38,7 @@ export function TranscriptPanel({
   showModal
 }: TranscriptPanelProps) {
   // Contexts
-  const { transcripts, transcriptContainerRef, copyTranscript } = useTranscripts();
+  const { transcripts, transcriptContainerRef, copyTranscript, meetingTitle } = useTranscripts();
   const { transcriptModelConfig, betaFeatures } = useConfig();
   const { isRecording, isPaused } = useRecordingState();
   const { checkPermissions, isChecking, hasSystemAudio, hasMicrophone } = usePermissionCheck();
@@ -105,78 +104,45 @@ export function TranscriptPanel({
   );
 
   return (
-    <div ref={transcriptContainerRef} className="w-full border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
-      {/* Title area - Sticky header */}
-      <div className="sticky top-0 z-10 bg-white p-4 border-gray-200">
-        <div className="flex flex-col space-y-3">
-          <div className="flex  flex-col space-y-2">
-            <div className="flex justify-center  items-center space-x-2">
-              {isRecording && (
-                <div className="flex rounded-full bg-stone-100 p-1">
-                  <button
-                    type="button"
-                    onClick={() => setRecordingView('notes')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${recordingView === 'notes' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
-                  >
-                    <PencilLine className="h-3.5 w-3.5" /> Notes
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRecordingView('transcript')}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${recordingView === 'transcript' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
-                  >
-                    <FileText className="h-3.5 w-3.5" /> Transcript
-                  </button>
-                </div>
-              )}
-              <ButtonGroup>
-                {transcripts?.length > 0 && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copyTranscript}
-                    title="Copy Transcript"
-                  >
-                    <Copy />
-                    <span className='hidden md:inline'>
-                      Copy
-                    </span>
-                  </Button>
-                )}
-                {transcriptModelConfig.provider === "localWhisper" &&
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => showModal('languageSettings')}
-                    title="Language"
-                  >
-                    <GlobeIcon />
-                    <span className='hidden md:inline'>
-                      Language
-                    </span>
-                  </Button>
-                }
-              </ButtonGroup>
-              {showLiveTranscriptToggle && (
-                <div className="flex items-center gap-2 ml-3">
-                  <Switch
-                    checked={liveTranscriptEnabled}
-                    onCheckedChange={handleLiveTranscriptToggle}
-                    disabled={isRecording}
-                  />
-                  <span className={`text-xs ${isRecording ? 'text-gray-300' : 'text-gray-500'}`}>
-                    Live transcription{isRecording ? ' (locked)' : ''}
-                  </span>
-                </div>
-              )}
+    <div ref={transcriptContainerRef} className="flex h-full w-full flex-col overflow-hidden bg-[#fbfaf7] text-[#272622]">
+      {isRecording ? (
+        <header className="flex h-[76px] shrink-0 items-center justify-between border-b border-[#e5e2da] bg-[#fbfaf7] px-8">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#a34436]">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-[#d74d3f]" /> Recording
             </div>
+            <h1 className="mt-1 truncate text-lg font-semibold tracking-[-0.02em]">{meetingTitle.replace(/^\+\s*/, '')}</h1>
           </div>
-        </div>
-      </div>
+          <div className="flex rounded-xl bg-[#efede7] p-1">
+            <button type="button" onClick={() => setRecordingView('notes')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${recordingView === 'notes' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
+              <PencilLine className="h-3.5 w-3.5" /> Notes
+            </button>
+            <button type="button" onClick={() => setRecordingView('transcript')} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium ${recordingView === 'transcript' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
+              <FileText className="h-3.5 w-3.5" /> Transcript
+            </button>
+          </div>
+        </header>
+      ) : (
+        <header className="flex h-[76px] shrink-0 items-center justify-end px-8">
+          <div className="flex items-center gap-3 text-xs text-[#77736a]">
+            {transcriptModelConfig.provider === 'localWhisper' && (
+              <button type="button" onClick={() => showModal('languageSettings')} className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 hover:bg-black/5">
+                <GlobeIcon className="h-3.5 w-3.5" /> Language
+              </button>
+            )}
+            {showLiveTranscriptToggle && (
+              <label className="flex items-center gap-2" title="Live transcription is optional; audio is always saved">
+                <Switch checked={liveTranscriptEnabled} onCheckedChange={handleLiveTranscriptToggle} />
+                Live transcript
+              </label>
+            )}
+          </div>
+        </header>
+      )}
 
       {/* Permission Warning - Not needed on Linux */}
       {!isRecording && !isChecking && !isLinux && (
-        <div className="flex justify-center px-4 pt-4">
+        <div className="flex justify-center px-8 pt-2">
           <PermissionWarning
             hasMicrophone={hasMicrophone}
             hasSystemAudio={hasSystemAudio}
@@ -191,18 +157,33 @@ export function TranscriptPanel({
         <div className="min-h-0 flex-1">
           <LiveNotesPad />
         </div>
+      ) : !isRecording ? (
+        <div className="flex flex-1 items-center justify-center px-8 pb-28">
+          <div className="max-w-xl text-center">
+            <div className="mx-auto mb-7 flex h-16 w-16 items-center justify-center rounded-[22px] bg-[#e7eee5] text-[#55735c]">
+              <PencilLine className="h-7 w-7" />
+            </div>
+            <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-[#272622]">Ready for your next meeting</h1>
+            <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-[#77736a]">Start once, stay present, and jot only what matters. Meetily records quietly and turns the conversation into useful notes afterward.</p>
+            <p className="mt-7 text-xs text-[#aaa69b]">Live transcription is off by default · audio stays on this Mac</p>
+          </div>
+        </div>
       ) : (
-      <div className="pb-20">
+      <div className="min-h-0 flex-1 pb-20">
         {isRecording && (!showLiveTranscriptToggle || !liveTranscriptEnabled) ? (
-          <div className="flex flex-col items-center justify-center py-24 space-y-4">
-            <div className="h-8 w-8 rounded-full bg-red-500 animate-pulse" />
-            <p className="text-sm text-gray-400">
-              Recording{!liveTranscriptEnabled && showLiveTranscriptToggle ? ' (live transcription off)' : '...'}
-            </p>
+          <div className="flex h-full flex-col items-center justify-center space-y-3 text-center">
+            <FileText className="h-7 w-7 text-[#aaa69b]" />
+            <p className="text-sm font-medium text-[#5d5a53]">Transcript will appear after the meeting</p>
+            <p className="text-xs text-[#9b978d]">Your recording is safe. Return to Notes to keep writing.</p>
           </div>
         ) : (
           <div className="flex justify-center">
-            <div className="w-2/3 max-w-[750px]">
+            <div className="w-full max-w-[820px]">
+              {transcripts?.length > 0 && (
+                <div className="flex justify-end px-4 py-2">
+                  <Button variant="ghost" size="sm" onClick={copyTranscript}><Copy className="h-4 w-4" /> Copy</Button>
+                </div>
+              )}
               <VirtualizedTranscriptView
                 segments={segments}
                 isRecording={isRecording}

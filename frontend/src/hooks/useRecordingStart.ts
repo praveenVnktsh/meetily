@@ -138,9 +138,11 @@ export function useRecordingStart(
     try {
       console.log('handleRecordingStart called - checking selected transcription model status');
 
-      // Check the selected transcription model before starting.
-      const modelReady = await checkModelReady();
-      if (!modelReady) {
+      const liveTranscriptionEnabled = await configureLiveTranscription();
+      // Record-only mode must never be blocked by speech-model setup. The model
+      // is needed at start only when live transcription was explicitly enabled.
+      const modelReady = !liveTranscriptionEnabled || await checkModelReady();
+      if (liveTranscriptionEnabled && !modelReady) {
         const isDownloading = await checkIfModelDownloading();
         if (isDownloading) {
           toast.info('Model download in progress', {
@@ -170,7 +172,6 @@ export function useRecordingStart(
 
       // Start the actual backend recording
       console.log('Starting backend recording with meeting:', randomTitle);
-      await configureLiveTranscription();
       await recordingService.startRecordingWithDevices(
         selectedDevices?.micDevice || null,
         selectedDevices?.systemDevice || null,
@@ -231,9 +232,9 @@ export function useRecordingStart(
           setIsAutoStarting(true);
           sessionStorage.removeItem('autoStartRecording'); // Clear the flag
 
-          // Check the selected transcription model before starting.
-          const modelReady = await checkModelReady();
-          if (!modelReady) {
+          const liveTranscriptionEnabled = await configureLiveTranscription();
+          const modelReady = !liveTranscriptionEnabled || await checkModelReady();
+          if (liveTranscriptionEnabled && !modelReady) {
             const isDownloading = await checkIfModelDownloading();
             if (isDownloading) {
               toast.info('Model download in progress', {
@@ -263,7 +264,6 @@ export function useRecordingStart(
             setStatus(RecordingStatus.STARTING, 'Initializing recording...');
 
             console.log('Auto-starting backend recording with meeting:', generatedMeetingTitle);
-            await configureLiveTranscription();
             const result = await recordingService.startRecordingWithDevices(
               selectedDevices?.micDevice || null,
               selectedDevices?.systemDevice || null,
@@ -332,9 +332,9 @@ export function useRecordingStart(
       console.log('Direct start from sidebar - checking selected transcription model status');
       setIsAutoStarting(true);
 
-      // Check the selected transcription model before starting.
-      const modelReady = await checkModelReady();
-      if (!modelReady) {
+      const liveTranscriptionEnabled = await configureLiveTranscription();
+      const modelReady = !liveTranscriptionEnabled || await checkModelReady();
+      if (liveTranscriptionEnabled && !modelReady) {
         const isDownloading = await checkIfModelDownloading();
         if (isDownloading) {
           toast.info('Model download in progress', {
@@ -363,7 +363,6 @@ export function useRecordingStart(
         setStatus(RecordingStatus.STARTING, 'Initializing recording...');
 
         console.log('Starting backend recording with meeting:', generatedMeetingTitle);
-        await configureLiveTranscription();
         const result = await recordingService.startRecordingWithDevices(
           selectedDevices?.micDevice || null,
           selectedDevices?.systemDevice || null,

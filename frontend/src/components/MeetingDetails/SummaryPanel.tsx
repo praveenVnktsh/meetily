@@ -21,6 +21,7 @@ import {
   SummaryLanguageStorage,
 } from '@/lib/summary-language-preferences';
 import { hasVisibleSummaryContent } from '@/lib/summary-content';
+import { MeetingRawNotesEditor } from './MeetingRawNotesEditor';
 
 interface SummaryPanelProps {
   meeting: {
@@ -88,6 +89,7 @@ export function SummaryPanel({
   const [summaryLang, setSummaryLang] = useState<string | null>(null);
   const [summaryLangStorage, setSummaryLangStorage] = useState<SummaryLanguageStorage>('metadata');
   const [langPickerOpen, setLangPickerOpen] = useState(false);
+  const [notesView, setNotesView] = useState<'enhanced' | 'raw'>('enhanced');
   const languageLoadVersionRef = useRef(0);
   const activeMeetingIdRef = useRef(meeting.id);
   const languageSaveVersionRef = useRef(0);
@@ -242,44 +244,55 @@ export function SummaryPanel({
   );
 
   return (
-    <div className="flex-1 min-w-0 flex flex-col bg-white overflow-hidden h-full w-full @container">
-      {/* Top-level actions — always visible, same pattern as TranscriptPanel */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-center w-full min-w-0 gap-2 flex-wrap">
-          <div className="flex-shrink-0 min-w-0">
-            <SummaryGeneratorButtonGroup
-              modelConfig={modelConfig}
-              setModelConfig={setModelConfig}
-              onSaveModelConfig={onSaveModelConfig}
-              onGenerateSummary={onGenerateSummary}
-              onStopGeneration={onStopGeneration}
-              customPrompt={customPrompt}
-              summaryStatus={summaryStatus}
-              availableTemplates={availableTemplates}
-              selectedTemplate={selectedTemplate}
-              onTemplateSelect={onTemplateSelect}
-              hasTranscripts={transcripts.length > 0}
-              hasSummary={hasSummary}
-              isModelConfigLoading={isModelConfigLoading}
-              onOpenModelSettings={onOpenModelSettings}
-              languageSlot={transcripts.length > 0 || hasSummary ? languageSlot : undefined}
-            />
-          </div>
-
-          {hasSummary && !isSummaryLoading && (
-            <div className="flex-shrink-0">
-              <SummaryUpdaterButtonGroup
-                isSaving={isSaving}
-                isDirty={isSummaryDirty}
-                onSave={onSaveAll}
-                onCopy={onCopySummary}
+    <div className="flex-1 min-w-0 flex flex-col bg-[#fbfaf7] overflow-hidden h-full w-full @container">
+      <div className="flex items-center justify-between px-8 py-3">
+        <div className="flex rounded-xl bg-[#efede7] p-1">
+          <button type="button" onClick={() => setNotesView('enhanced')} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${notesView === 'enhanced' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
+            Enhanced notes
+          </button>
+          <button type="button" onClick={() => setNotesView('raw')} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${notesView === 'raw' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
+            Raw notes
+          </button>
+        </div>
+      {(hasSummary || isSummaryLoading) && notesView === 'enhanced' && (
+          <div className="flex items-center justify-end gap-2">
+            <div className="min-w-0 flex-shrink-0">
+              <SummaryGeneratorButtonGroup
+                modelConfig={modelConfig}
+                setModelConfig={setModelConfig}
+                onSaveModelConfig={onSaveModelConfig}
+                onGenerateSummary={onGenerateSummary}
+                onStopGeneration={onStopGeneration}
+                customPrompt={customPrompt}
+                summaryStatus={summaryStatus}
+                availableTemplates={availableTemplates}
+                selectedTemplate={selectedTemplate}
+                onTemplateSelect={onTemplateSelect}
+                hasTranscripts={transcripts.length > 0}
+                hasSummary={hasSummary}
+                isModelConfigLoading={isModelConfigLoading}
+                onOpenModelSettings={onOpenModelSettings}
+                languageSlot={transcripts.length > 0 || hasSummary ? languageSlot : undefined}
               />
             </div>
-          )}
-        </div>
+
+            {hasSummary && !isSummaryLoading && (
+              <div className="flex-shrink-0">
+                <SummaryUpdaterButtonGroup
+                  isSaving={isSaving}
+                  isDirty={isSummaryDirty}
+                  onSave={onSaveAll}
+                  onCopy={onCopySummary}
+                />
+              </div>
+            )}
+          </div>
+      )}
       </div>
 
-      {isSummaryLoading ? (
+      {notesView === 'raw' ? (
+        <MeetingRawNotesEditor meetingId={meeting.id} />
+      ) : isSummaryLoading ? (
         <div className="flex items-center justify-center flex-1">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
@@ -295,7 +308,7 @@ export function SummaryPanel({
         />
       ) : (
         <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0">
-          <div className="p-6 w-full">
+          <div className="mx-auto w-full max-w-[900px] px-10 pb-20 pt-6">
             <BlockNoteSummaryView
               ref={summaryRef}
               summaryData={aiSummary}

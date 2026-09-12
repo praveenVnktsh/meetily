@@ -6,10 +6,12 @@ export interface LiveNote {
 }
 
 export interface LiveNotesDocument {
-  version: 1;
+  version: number;
   meetingStartedAtMs: number;
   updatedAt: string;
   notes: LiveNote[];
+  rawMarkdown?: string;
+  editorBlocks?: unknown[];
 }
 
 export const LIVE_NOTES_FALLBACK_KEY = 'meetily.liveNotes.current';
@@ -28,7 +30,9 @@ export function createLiveNote(timestampSeconds: number): LiveNote {
 }
 
 export function buildLiveNotesSummaryContext(document: LiveNotesDocument | null): string {
-  if (!document?.notes.some((note) => note.text.length > 0)) return '';
+  if (!document) return '';
+  const rawMarkdown = document.rawMarkdown?.trim();
+  if (!rawMarkdown && !document.notes.some((note) => note.text.length > 0)) return '';
   const notes = document.notes
     .filter((note) => note.text.length > 0)
     .map((note) => `[${formatNoteTimestamp(note.timestampSeconds)}]${note.important ? ' IMPORTANT' : ''}\n${note.text}`)
@@ -36,7 +40,7 @@ export function buildLiveNotesSummaryContext(document: LiveNotesDocument | null)
   return [
     'The following are the user\'s original live notes. Treat them as strong attention signals when deciding what to expand, emphasize, and include. Use the transcript as supporting evidence. Never rewrite, replace, or claim to edit the original notes.',
     '<user_live_notes>',
-    notes,
+    rawMarkdown || notes,
     '</user_live_notes>',
   ].join('\n');
 }

@@ -4,7 +4,13 @@ import { useState, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import { Copy, FolderOpen, RefreshCw, UserRoundCog, Users } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Copy, FolderOpen, MoreHorizontal, RefreshCw, UserRoundCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import Analytics from '@/lib/analytics';
 import { RetranscribeDialog } from './RetranscribeDialog';
@@ -34,6 +40,12 @@ export function TranscriptButtonGroup({
   const { betaFeatures } = useConfig();
   const [showRetranscribeDialog, setShowRetranscribeDialog] = useState(false);
   const [isIdentifyingSpeakers, setIsIdentifyingSpeakers] = useState(false);
+  const hasMoreActions = Boolean(
+    meetingId && (
+      (betaFeatures.importAndRetranscribe && meetingFolderPath)
+      || (transcriptCount > 0 && (meetingFolderPath || onOpenSpeakerManager))
+    )
+  );
 
   const handleRetranscribeComplete = useCallback(async () => {
     // Refetch transcripts to show the updated data
@@ -64,7 +76,7 @@ export function TranscriptButtonGroup({
   }, [isIdentifyingSpeakers, meetingId, onRefetchTranscripts]);
 
   return (
-    <div className="flex items-center justify-center w-full gap-2">
+    <div className="flex w-full items-center justify-end gap-2">
       <ButtonGroup>
         <Button
           variant="outline"
@@ -95,50 +107,34 @@ export function TranscriptButtonGroup({
           <span className="hidden @[22rem]:inline">Recording</span>
         </Button>
 
-        {betaFeatures.importAndRetranscribe && meetingId && meetingFolderPath && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 border-blue-200 px-2 @[22rem]:px-4"
-            onClick={() => {
-              Analytics.trackButtonClick('enhance_transcript', 'meeting_details');
-              setShowRetranscribeDialog(true);
-            }}
-            title="Retranscribe to enhance your recorded audio"
-          >
-            <RefreshCw className="@[22rem]:mr-2" size={18} />
-            <span className="hidden @[22rem]:inline">Enhance</span>
-          </Button>
-        )}
-
-        {meetingId && meetingFolderPath && transcriptCount > 0 && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="px-2 @[22rem]:px-4"
-            onClick={handleIdentifySpeakers}
-            disabled={isIdentifyingSpeakers}
-            title="Identify speakers locally from the saved recording"
-          >
-            <Users className={`@[22rem]:mr-2 ${isIdentifyingSpeakers ? 'animate-pulse' : ''}`} size={18} />
-            <span className="hidden @[22rem]:inline">
-              {isIdentifyingSpeakers ? 'Identifying…' : 'Speakers'}
-            </span>
-          </Button>
-        )}
-
-        {meetingId && transcriptCount > 0 && onOpenSpeakerManager && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="px-2 @[22rem]:px-4"
-            onClick={onOpenSpeakerManager}
-            title="Rename, merge, or reassign speakers"
-          >
-            <UserRoundCog className="@[22rem]:mr-2" size={18} />
-            <span className="hidden @[22rem]:inline">Names</span>
-          </Button>
-        )}
+        {hasMoreActions && <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline" className="px-2.5" title="More transcript actions" aria-label="More transcript actions">
+              <MoreHorizontal size={18} />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            {betaFeatures.importAndRetranscribe && meetingId && meetingFolderPath && (
+              <DropdownMenuItem onClick={() => {
+                Analytics.trackButtonClick('enhance_transcript', 'meeting_details');
+                setShowRetranscribeDialog(true);
+              }}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Enhance transcript
+              </DropdownMenuItem>
+            )}
+            {meetingId && meetingFolderPath && transcriptCount > 0 && (
+              <DropdownMenuItem onClick={() => void handleIdentifySpeakers()} disabled={isIdentifyingSpeakers}>
+                <Users className={`mr-2 h-4 w-4 ${isIdentifyingSpeakers ? 'animate-pulse' : ''}`} />
+                {isIdentifyingSpeakers ? 'Identifying speakers…' : 'Identify speakers'}
+              </DropdownMenuItem>
+            )}
+            {meetingId && transcriptCount > 0 && onOpenSpeakerManager && (
+              <DropdownMenuItem onClick={onOpenSpeakerManager}>
+                <UserRoundCog className="mr-2 h-4 w-4" /> Manage speaker names
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>}
       </ButtonGroup>
 
       {betaFeatures.importAndRetranscribe && meetingId && meetingFolderPath && (

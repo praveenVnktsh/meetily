@@ -281,10 +281,15 @@ async fn prepare_audio_for_recording(
                 .default_output_device()
                 .and_then(|d| d.name().ok())
         });
-    if let Some(name) = wake_name {
+    if let Some(name) = wake_name.filter(|name| {
+        let normalized = name.to_ascii_lowercase();
+        !normalized.contains("macbook") && !normalized.contains("built-in")
+    }) {
         if let Err(e) = super::recording_manager::wake_audio_connection(&name).await {
             warn!("[AUDIO_WAKE] Wake failed: {} — proceeding anyway", e);
         }
+    } else {
+        info!("[AUDIO_WAKE] Built-in output selected; skipping unnecessary audio wake");
     }
 
     if let Err(e) = super::devices::verify_microphone_access().await {
@@ -322,30 +327,29 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
         return Err("Recording already in progress".to_string());
     }
 
-    if let Err(error) = crate::ensure_onnx_runtime_available() {
-        return Err(map_recording_start_error(
-            &app,
-            RecordingStartError::TranscriptionRuntime(error),
-        ));
+    if super::pipeline::LIVE_TRANSCRIPTION_ENABLED.load(Ordering::SeqCst) {
+        if let Err(error) = crate::ensure_onnx_runtime_available() {
+            return Err(map_recording_start_error(
+                &app,
+                RecordingStartError::TranscriptionRuntime(error),
+            ));
+        }
+
+        info!("🔍 Validating transcription model availability before starting recording...");
+        if let Err(validation_error) = transcription::validate_transcription_model_ready(&app).await {
+            error!("Model validation failed: {}", validation_error);
+            let _ = app.emit("transcription-error", serde_json::json!({
+                "error": validation_error,
+                "userMessage": format!("Recording cannot start: {}", validation_error),
+                "actionable": false,
+                "phase": "startup"
+            }));
+            return Err(validation_error);
+        }
+        info!("✅ Transcription model validation passed");
+    } else {
+        info!("⏺️ Deferred transcription mode: skipping startup model validation");
     }
-
-    // Validate that transcription models are available before starting recording
-    info!("🔍 Validating transcription model availability before starting recording...");
-    if let Err(validation_error) = transcription::validate_transcription_model_ready(&app).await {
-        error!("Model validation failed: {}", validation_error);
-
-        // Emit error event for frontend - actionable: false to show toast instead of modal
-        // (download progress is already shown in top-right toast)
-        let _ = app.emit("transcription-error", serde_json::json!({
-            "error": validation_error,
-            "userMessage": format!("Recording cannot start: {}", validation_error),
-            "actionable": false,
-            "phase": "startup"
-        }));
-
-        return Err(validation_error);
-    }
-    info!("✅ Transcription model validation passed");
 
     // Notify frontend that startup has begun (surfaces STARTING state)
     app.emit("recording-starting", serde_json::json!({
@@ -518,30 +522,29 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
         return Err("Recording already in progress".to_string());
     }
 
-    if let Err(error) = crate::ensure_onnx_runtime_available() {
-        return Err(map_recording_start_error(
-            &app,
-            RecordingStartError::TranscriptionRuntime(error),
-        ));
+    if super::pipeline::LIVE_TRANSCRIPTION_ENABLED.load(Ordering::SeqCst) {
+        if let Err(error) = crate::ensure_onnx_runtime_available() {
+            return Err(map_recording_start_error(
+                &app,
+                RecordingStartError::TranscriptionRuntime(error),
+            ));
+        }
+
+        info!("🔍 Validating transcription model availability before starting recording...");
+        if let Err(validation_error) = transcription::validate_transcription_model_ready(&app).await {
+            error!("Model validation failed: {}", validation_error);
+            let _ = app.emit("transcription-error", serde_json::json!({
+                "error": validation_error,
+                "userMessage": format!("Recording cannot start: {}", validation_error),
+                "actionable": false,
+                "phase": "startup"
+            }));
+            return Err(validation_error);
+        }
+        info!("✅ Transcription model validation passed");
+    } else {
+        info!("⏺️ Deferred transcription mode: skipping startup model validation");
     }
-
-    // Validate that transcription models are available before starting recording
-    info!("🔍 Validating transcription model availability before starting recording...");
-    if let Err(validation_error) = transcription::validate_transcription_model_ready(&app).await {
-        error!("Model validation failed: {}", validation_error);
-
-        // Emit error event for frontend - actionable: false to show toast instead of modal
-        // (download progress is already shown in top-right toast)
-        let _ = app.emit("transcription-error", serde_json::json!({
-            "error": validation_error,
-            "userMessage": format!("Recording cannot start: {}", validation_error),
-            "actionable": false,
-            "phase": "startup"
-        }));
-
-        return Err(validation_error);
-    }
-    info!("✅ Transcription model validation passed");
 
     // Notify frontend that startup has begun (surfaces STARTING state)
     app.emit("recording-starting", serde_json::json!({
