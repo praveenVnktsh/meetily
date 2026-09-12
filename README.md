@@ -1,63 +1,93 @@
-# Minutes
+<p align="center">
+  <img src="docs/assets/banner.png" alt="Minutes — local-first AI meeting notes" width="820" />
+</p>
 
-Minutes is a local-first AI meeting assistant for macOS and Windows. It records your microphone and system audio, turns the conversation into clean, skimmable notes, and keeps everything on your machine unless you explicitly configure an external AI provider.
+<p align="center">
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-000000?style=for-the-badge" alt="Platforms" />
+  <img src="https://img.shields.io/badge/stack-Tauri%202%20%C2%B7%20Rust%20%C2%B7%20Next.js-000000?style=for-the-badge" alt="Stack" />
+  <img src="https://img.shields.io/badge/100%25%20local-%26%20private-2ea043?style=for-the-badge" alt="Local-first" />
+  <img src="https://img.shields.io/badge/license-MIT-3b82f6?style=for-the-badge" alt="MIT" />
+  <img src="https://img.shields.io/github/stars/praveenvnktsh/minutes?style=for-the-badge" alt="Stars" />
+</p>
 
-It is built to feel like a notes app first: you jot down what matters during the call, and Minutes quietly enriches those notes from the transcript.
+<p align="center">
+  <b>Minutes</b> records your meetings, transcribes them locally, and writes clean notes that build on the notes you already took.<br/>
+  Audio, transcripts, notes, and summaries stay on your machine unless you explicitly configure an external AI provider.
+</p>
+
+---
+
+## Screenshots
+
+<p align="center">
+  <img src="docs/assets/workspace.png" alt="The Minutes meeting workspace: notes on the left, transcript dock on the right" width="100%" />
+</p>
+
+<p align="center">
+  <img src="docs/assets/chat.png" alt="Chat with the meeting" width="49%" />
+  <img src="docs/assets/workspace-light.png" alt="Light theme" width="49%" />
+</p>
+
+---
+
+## Why Minutes
+
+- **Notes-first, not a report generator.** You jot down what matters; Minutes enriches those exact notes from the transcript instead of dumping a generic template on you.
+- **Everything on-device.** Whisper/Parakeet transcription, speaker diarization, and local summary models. No account, no cloud.
+- **One screen from start to finish.** Hit record and the meeting workspace opens immediately — notes, live transcript, and chat live together with a floating record bar.
 
 ## Features
 
 ### Capture
-- Record microphone and system audio together with professional mixing and clipping protection.
-- Live transcription on demand, or transcribe after the meeting to stay light on CPU.
-- Voice Activity Detection so only speech is sent to the model.
+- Record **microphone + system audio** together with professional mixing and clipping protection.
+- **Live transcription** on demand, or transcribe after the meeting to stay light on CPU.
+- Voice Activity Detection so only speech reaches the model.
 - Detect supported meetings and offer to start recording automatically.
-- Menu bar state for idle, recording, and paused.
+- Menu-bar state for idle, recording, and paused.
 
 ### The meeting workspace
-- One unified screen from the moment you hit record: notes, transcript, and chat live together, with a floating record bar.
-- Write live notes while the meeting runs; they persist continuously to the meeting folder and database.
-- Raw notes stay editable after the meeting, side by side with the transcript.
-- Live transcript dock with search and color-coded speaker chips.
-- Collapsible navigation rail and a collapsible transcript/chat dock.
-- Responsive layout: on narrow windows the sidebar collapses and the dock becomes a bottom panel.
-- Light and dark themes.
+- A single workspace from the moment you hit record — with a **floating record bar**.
+- **Live notes** you can type during the call, persisted continuously.
+- **Raw notes stayed editable** after the meeting, side by side with the transcript.
+- **Live transcript dock** with search and color-coded speaker chips.
+- **Ask your meeting**: a chat that can reference the transcript and your notes.
+- **Collapsible** navigation rail and transcript/chat dock.
+- **Responsive**: narrow windows collapse the rail and dock the transcript/chat at the bottom.
+- **Light and dark** themes.
 
 ### Notes and summaries
-- Enhanced notes: concise, skimmable bullet points that **build on the notes you already wrote**, keeping your wording and order while adding specifics from the transcript.
-- Free-form notes — no templates to pick, no rigid sections.
-- The model also names the meeting from the notes, and the title stays inline editable.
-- Re-enhance any time with a single refresh action; stop an in-flight generation.
-- Optional per-meeting summary language.
-
-### Ask your meeting
-- Chat with the meeting; the assistant can reference the transcript and your notes.
-- The assistant can revise the enhanced notes and apply revision-backed transcript edits.
-- Suggested prompts to get started.
+- **Enhanced notes** as concise, skimmable bullet points that **build on your own notes** — keeping your wording and order while adding specifics from the transcript.
+- **No templates**, no rigid sections. Free-form notes that read like yours.
+- The model **names the meeting** from the notes; the title stays inline editable.
+- **Re-enhance** any time with one click; stop an in-flight generation.
+- Optional per-meeting **summary language**.
 
 ### Transcription and models
-- Whisper.cpp / whisper-rs and NVIDIA Parakeet paths, running locally.
-- GPU acceleration: Metal + CoreML on macOS, CUDA/Vulkan on Windows/Linux, CPU fallback.
-- Built-in AI summary models, plus Ollama for local summarization.
-- Optional external summary providers (Claude, Groq, OpenRouter) when you configure them.
-- Speaker diarization with an editable speaker manager and reassignment.
-- Import existing audio and retranscribe; transcription queue with background processing.
+- **Whisper.cpp / whisper-rs** and **NVIDIA Parakeet** paths, running locally.
+- **GPU acceleration**: Metal + CoreML (macOS), CUDA/Vulkan (Windows/Linux), CPU fallback.
+- **Built-in AI** summary models plus **Ollama** for local summarization.
+- Optional external providers (**Claude, Groq, OpenRouter**) when you configure them.
+- **Speaker diarization** with an editable speaker manager and reassignment.
+- **Import audio** and retranscribe; background transcription queue.
 
 ### Data
-- Meetings, transcripts, and summaries are stored locally in SQLite.
+- Meetings, transcripts, and summaries stored locally in **SQLite**.
 - Full-text transcript search and a meetings list with dates.
-- Signed-update friendly desktop build.
+- Signed desktop updates.
 
 ## Install
 
-Prebuilt packages are published on the [Releases page](https://github.com/praveenvnktsh/minutes/releases/latest).
+Prebuilt packages are on the [Releases page](https://github.com/praveenvnktsh/minutes/releases/latest).
 
-- **macOS**: Apple Silicon (`minutes.app`).
-- **Windows**: x64 with AVX2, Vulkan for Whisper acceleration.
-- **Linux**: supported via source builds.
+| Platform | Notes |
+| --- | --- |
+| **macOS** | Apple Silicon (`minutes.app`) |
+| **Windows** | x64 with AVX2; Vulkan for Whisper acceleration |
+| **Linux** | Supported via source builds |
 
-## Build from source
+## Quick start
 
-Install Rust, Node.js, pnpm 9.15.9, and the native build tools for your platform. On macOS install Xcode and select it with `xcode-select`.
+Install Rust, Node.js, pnpm 9.15.9, and your platform's native build tools. On macOS install Xcode and select it with `xcode-select`.
 
 ```bash
 git clone https://github.com/praveenvnktsh/minutes.git
@@ -77,13 +107,21 @@ See [docs/BUILDING.md](docs/BUILDING.md) and [docs/building_in_linux.md](docs/bu
 
 ## Architecture
 
-Minutes is a Tauri 2 desktop app: a Next.js/React interface inside a Rust core. Rust handles audio capture, local inference, persistence, notifications, meeting detection, and updates. The frontend talks to Rust through Tauri commands and events, and all meeting data lives in a local SQLite database.
+```mermaid
+flowchart LR
+  UI["Next.js / React UI"] <-->|Tauri commands & events| Core["Rust core"]
+  Core --> Audio["Audio capture (mic + system)"]
+  Core --> STT["Local STT (Whisper / Parakeet)"]
+  Core --> Diar["Speaker diarization"]
+  Core --> LLM["Local LLM (built-in / Ollama)"]
+  Core --> DB[("SQLite: meetings, transcripts, notes")]
+```
 
-See [docs/architecture.md](docs/architecture.md) for details.
+Minutes is a Tauri 2 desktop app: a Next.js/React interface inside a Rust core. Rust handles audio capture, local inference, persistence, notifications, meeting detection, and updates; all meeting data lives in a local SQLite database. See [docs/architecture.md](docs/architecture.md).
 
 ## Privacy
 
-Usage telemetry is disabled, and no analytics destination is configured. Audio, transcripts, notes, and summaries stay on your machine. If you configure an external AI provider, the data sent to it is governed by that provider's terms and your configuration. See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+Usage telemetry is disabled and no analytics destination is configured. Audio, transcripts, notes, and summaries stay on your machine. If you configure an external AI provider, the data sent to it is governed by that provider's terms and your configuration. Read the [privacy policy](PRIVACY_POLICY.md).
 
 ## Updates
 
@@ -95,7 +133,7 @@ Release artifacts are signed with this fork's Tauri updater key; the private key
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License and acknowledgments
 
