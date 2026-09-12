@@ -8,39 +8,57 @@ import { createLiveNote, type LiveNotesDocument } from '@/lib/liveNotes';
 export function MeetingRawNotesEditor({ meetingId }: { meetingId: string }) {
   const [document, setDocument] = useState<LiveNotesDocument | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadedFromStore, setLoadedFromStore] = useState(false);
   const [saveState, setSaveState] = useState<'saved' | 'saving'>('saved');
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
   const pendingDocumentRef = useRef<LiveNotesDocument | null>(null);
   const hasPendingSaveRef = useRef(false);
 
+  const emptyDocument = useCallback((): LiveNotesDocument => ({
+    version: 1,
+    meetingStartedAtMs: Date.now(),
+    updatedAt: new Date().toISOString(),
+    notes: [createLiveNote(0)],
+  }), []);
+
+  const loadNotes = useCallback(async (showLoading: boolean) => {
+    if (showLoading) setLoading(true);
+    try {
+      const result = await invoke<LiveNotesDocument | null>('get_meeting_live_notes', { meetingId });
+      if (result) {
+        setDocument(result);
+        setLoadedFromStore(true);
+      } else {
+        // Keep anything already on screen; only seed an empty editor once.
+        setDocument((current) => current ?? emptyDocument());
+      }
+    } catch (error) {
+      console.warn('Could not load original meeting notes:', error);
+      setDocument((current) => current ?? emptyDocument());
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  }, [meetingId, emptyDocument]);
+
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    invoke<LiveNotesDocument | null>('get_meeting_live_notes', { meetingId })
-      .then((result) => {
-        if (cancelled) return;
-        // Always provide an editable surface, even when the meeting has no notes yet.
-        setDocument(result ?? {
-          version: 1,
-          meetingStartedAtMs: Date.now(),
-          updatedAt: new Date().toISOString(),
-          notes: [createLiveNote(0)],
-        });
-      })
-      .catch((error) => {
-        console.warn('Could not load original meeting notes:', error);
-        if (!cancelled) {
-          setDocument({
-            version: 1,
-            meetingStartedAtMs: Date.now(),
-            updatedAt: new Date().toISOString(),
-            notes: [createLiveNote(0)],
-          });
-        }
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [meetingId]);
+    void loadNotes(true);
+  }, [loadNotes]);
+
+  // The live-notes capture unmounts on stop, before the meeting row is finalized.
+  // Refetch once the stop pipeline has persisted the notes so nothing disappears.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const id = (event as CustomEvent<{ meetingId?: string }>).detail?.meetingId;
+      if (id && id !== meetingId) return;
+      void loadNotes(false);
+    };
+    window.addEventListener('meetily:recording-finalized', handler);
+    window.addEventListener('meetily:transcription-complete', handler);
+    return () => {
+      window.removeEventListener('meetily:recording-finalized', handler);
+      window.removeEventListener('meetily:transcription-complete', handler);
+    };
+  }, [meetingId, loadNotes]);
 
   const handleChange = useCallback((next: LiveNotesDocument) => {
     setDocument(next);
@@ -83,7 +101,11 @@ export function MeetingRawNotesEditor({ meetingId }: { meetingId: string }) {
   return (
     <div className="h-full overflow-y-auto">
       <div className="meeting-notes-editor raw-notes-editor mx-auto w-full max-w-[860px] px-10 pb-24 pt-6">
-        <BlockNotesEditor key={meetingId} document={document} onChange={handleChange} />
+        <BlockNotesEditor
+          key={`${meetingId}-${loadedFromStore ? 'stored' : 'blank'}`}
+          document={document}
+          onChange={handleChange}
+        />
       </div>
     </div>
   );
