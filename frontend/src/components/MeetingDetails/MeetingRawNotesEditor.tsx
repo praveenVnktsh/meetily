@@ -51,16 +51,16 @@ export function MeetingRawNotesEditor({ meetingId }: { meetingId: string }) {
   }
 
   return (
-    <div className="h-full overflow-y-auto px-8 pb-20 pt-6">
+    <div className="h-full overflow-y-auto px-8 pb-24 pt-1">
       <div className="mx-auto max-w-[860px]">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-5 flex min-h-[52px] items-center justify-between">
           <div>
-            <h2 className="text-sm font-semibold text-[#272622]">Raw notes</h2>
-            <p className="mt-0.5 text-xs text-[#8b887f]">Exactly what you captured during the meeting.</p>
+            <p className="text-xs font-medium text-[#5d5a53]">Raw notes</p>
+            <p className="mt-0.5 text-[11px] text-[#9b978d]">Exactly what you captured during the meeting</p>
           </div>
-          <span className="text-[11px] text-[#9b978d]">{saveState === 'saving' ? 'Saving…' : 'Saved'}</span>
+          <span className="text-[11px] text-[#9b978d]">{saveState === 'saving' ? 'Saving changes…' : 'All changes saved'}</span>
         </div>
-        <div className="min-h-[420px] rounded-2xl bg-white px-8 py-8 shadow-[0_1px_0_rgba(45,43,37,0.04)]">
+        <div className="min-h-[420px] px-2 py-2">
           <BlockNotesEditor key={meetingId} document={document} onChange={handleChange} />
         </div>
       </div>

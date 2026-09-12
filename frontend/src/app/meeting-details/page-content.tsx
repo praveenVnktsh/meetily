@@ -11,6 +11,7 @@ import { SummaryPanel } from '@/components/MeetingDetails/SummaryPanel';
 import { MeetingDetailsSplitView, type MeetingDetailsTab } from '@/components/MeetingDetails/MeetingDetailsSplitView';
 import { ModelConfig } from '@/components/ModelSettingsModal';
 import { MeetingAssistantPanel } from '@/components/MeetingDetails/MeetingAssistantPanel';
+import { MeetingRawNotesEditor } from '@/components/MeetingDetails/MeetingRawNotesEditor';
 
 // Custom hooks
 import { useMeetingData } from '@/hooks/meeting-details/useMeetingData';
@@ -223,9 +224,13 @@ export default function PageContent({
               onRefetchTranscripts={onRefetchTranscripts}
             />
           }
+          rawNotes={<MeetingRawNotesEditor meetingId={meeting.id} />}
           assistant={
             <MeetingAssistantPanel
               meetingId={meeting.id}
+              modelConfig={modelConfig}
+              setModelConfig={setModelConfig}
+              onSaveModelConfig={handleSaveModelConfig}
               onNotesUpdated={(markdown) => {
                 meetingData.setAiSummary({ markdown });
                 setActiveTab('summary');
@@ -240,7 +245,6 @@ export default function PageContent({
               summaryRef={meetingData.blockNoteSummaryRef}
               isSaving={meetingData.isSaving}
               isSummaryDirty={meetingData.isSummaryDirty}
-              onSaveAll={meetingData.saveAllChanges}
               onCopySummary={copyOperations.handleCopySummary}
               aiSummary={meetingData.aiSummary}
               summaryStatus={summaryGeneration.summaryStatus}

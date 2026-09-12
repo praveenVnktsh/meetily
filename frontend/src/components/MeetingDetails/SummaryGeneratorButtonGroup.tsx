@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog"
 import { VisuallyHidden } from "@/components/ui/visually-hidden"
 import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,15 +78,16 @@ export function SummaryGeneratorButtonGroup({
   }
 
   const isGenerating = summaryStatus === 'processing' || summaryStatus === 'summarizing' || summaryStatus === 'regenerating';
+  const selectedTemplateName = availableTemplates.find((template) => template.id === selectedTemplate)?.name ?? 'Template';
 
   return (
-    <ButtonGroup>
+    <div className="grid w-full grid-cols-2 gap-1.5 @[42rem]:flex @[42rem]:w-auto @[42rem]:items-center">
       {/* Generate Summary or Stop button */}
       {isGenerating ? (
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
-          className="bg-gradient-to-r from-red-50 to-orange-50 hover:from-red-100 hover:to-orange-100 border-red-200 px-3 gap-2"
+          className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#f4dfda] px-3 text-[#8a4138] hover:bg-[#edd1ca] @[42rem]:w-auto"
           onClick={() => {
             Analytics.trackButtonClick('stop_summary_generation', 'meeting_details');
             onStopGeneration();
@@ -99,9 +99,9 @@ export function SummaryGeneratorButtonGroup({
         </Button>
       ) : (
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
-          className="bg-gradient-to-r from-blue-50 to-purple-50 hover:from-blue-100 hover:to-purple-100 border-blue-200 px-3 gap-2"
+          className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#272622] px-3 text-white hover:bg-[#3b3934] hover:text-white @[42rem]:w-auto"
           onClick={() => {
             Analytics.trackButtonClick('generate_summary', 'meeting_details');
             void onGenerateSummary(customPrompt);
@@ -116,12 +116,12 @@ export function SummaryGeneratorButtonGroup({
           {isModelConfigLoading ? (
             <>
               <Loader2 className="animate-spin" size={18} />
-              <span className="hidden @[24rem]:inline">Processing...</span>
+              <span>Working…</span>
             </>
           ) : (
             <>
-              <Sparkles size={18} />
-              <span className="hidden @[24rem]:inline">{hasSummary ? 'Regenerate Summary' : 'Generate Summary'}</span>
+              <Sparkles size={16} />
+              <span>{hasSummary ? 'Regenerate' : 'Generate'}</span>
             </>
           )}
         </Button>
@@ -133,12 +133,13 @@ export function SummaryGeneratorButtonGroup({
       <Dialog open={settingsDialogOpen} onOpenChange={setSettingsDialogOpen}>
         <DialogTrigger asChild>
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             title="Summary Settings"
+            className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd] @[42rem]:w-auto @[42rem]:max-w-44"
           >
-            <Settings />
-            <span className="hidden @[40rem]:inline">AI Model</span>
+            <Settings className="h-3.5 w-3.5" />
+            <span className="max-w-32 truncate">{modelConfig.model || 'Choose model'}</span>
           </Button>
         </DialogTrigger>
         <DialogContent
@@ -165,12 +166,13 @@ export function SummaryGeneratorButtonGroup({
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               title="Select summary template"
+              className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd] @[42rem]:w-auto @[42rem]:max-w-40"
             >
-              <FileText />
-              <span className="hidden @[40rem]:inline">Template</span>
+              <FileText className="h-3.5 w-3.5" />
+              <span className="max-w-28 truncate">{selectedTemplateName}</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
@@ -191,6 +193,6 @@ export function SummaryGeneratorButtonGroup({
           </DropdownMenuContent>
         </DropdownMenu>
       )}
-    </ButtonGroup>
+    </div>
   );
 }

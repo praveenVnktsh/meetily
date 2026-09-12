@@ -186,12 +186,15 @@
     width: 100% !important;
     max-width: none !important;
     overflow: visible !important;
+    background: transparent !important;
   }
 
   .bn-editor {
     width: 100% !important;
     max-width: none !important;
     overflow: visible !important;
+    background: transparent !important;
+    padding-inline: 0 !important;
   }
 
   /* Disable internal scrolling - let parent handle all scrolling */
@@ -206,6 +209,14 @@
 
   .bn-default-styles {
     max-width: none !important;
+  }
+
+  .meeting-notes-editor .bn-container,
+  .meeting-notes-editor .bn-editor,
+  .meeting-notes-editor .bn-default-styles,
+  .meeting-notes-editor [data-color-scheme] {
+    background-color: transparent !important;
+    box-shadow: none !important;
   }
 
   /* Disable scrolling on any BlockNote wrapper elements */

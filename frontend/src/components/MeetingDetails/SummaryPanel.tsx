@@ -21,7 +21,6 @@ import {
   SummaryLanguageStorage,
 } from '@/lib/summary-language-preferences';
 import { hasVisibleSummaryContent } from '@/lib/summary-content';
-import { MeetingRawNotesEditor } from './MeetingRawNotesEditor';
 
 interface SummaryPanelProps {
   meeting: {
@@ -33,7 +32,6 @@ interface SummaryPanelProps {
   isSummaryDirty: boolean;
   summaryRef: RefObject<BlockNoteSummaryViewRef>;
   isSaving: boolean;
-  onSaveAll: () => Promise<void>;
   onCopySummary: () => Promise<void>;
   aiSummary: MeetingSummary | null;
   summaryStatus: 'idle' | 'processing' | 'summarizing' | 'regenerating' | 'completed' | 'error';
@@ -63,7 +61,6 @@ export function SummaryPanel({
   isSummaryDirty,
   summaryRef,
   isSaving,
-  onSaveAll,
   onCopySummary,
   aiSummary,
   summaryStatus,
@@ -89,7 +86,6 @@ export function SummaryPanel({
   const [summaryLang, setSummaryLang] = useState<string | null>(null);
   const [summaryLangStorage, setSummaryLangStorage] = useState<SummaryLanguageStorage>('metadata');
   const [langPickerOpen, setLangPickerOpen] = useState(false);
-  const [notesView, setNotesView] = useState<'enhanced' | 'raw'>('enhanced');
   const languageLoadVersionRef = useRef(0);
   const activeMeetingIdRef = useRef(meeting.id);
   const languageSaveVersionRef = useRef(0);
@@ -219,13 +215,14 @@ export function SummaryPanel({
     <Popover open={langPickerOpen} onOpenChange={setLangPickerOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="outline"
+          variant="ghost"
           size="sm"
+          className="h-8 w-full justify-start gap-1.5 rounded-full bg-[#efede7] px-3 text-[#5d5a53] hover:bg-[#e7e4dd] @[42rem]:w-auto"
           title={`Summary language: ${effectiveLangLabel}${isLocalFallbackLanguage ? ' (saved on this device)' : ''}`}
           aria-label="Set summary language"
         >
-          <Languages size={18} />
-          <span className="hidden @[40rem]:inline">{effectiveLangLabel}</span>
+          <Languages size={14} />
+          <span>{effectiveLangLabel}</span>
           <ChevronDown size={14} className="text-gray-400" />
         </Button>
       </PopoverTrigger>
@@ -245,18 +242,20 @@ export function SummaryPanel({
 
   return (
     <div className="flex-1 min-w-0 flex flex-col bg-[#fbfaf7] overflow-hidden h-full w-full @container">
-      <div className="flex items-center justify-between px-8 py-3">
-        <div className="flex rounded-xl bg-[#efede7] p-1">
-          <button type="button" onClick={() => setNotesView('enhanced')} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${notesView === 'enhanced' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
-            Enhanced notes
-          </button>
-          <button type="button" onClick={() => setNotesView('raw')} className={`rounded-lg px-3 py-1.5 text-xs font-medium ${notesView === 'raw' ? 'bg-white text-[#272622] shadow-sm' : 'text-[#77736a]'}`}>
-            Raw notes
-          </button>
-        </div>
-      {(hasSummary || isSummaryLoading) && notesView === 'enhanced' && (
-          <div className="flex items-center justify-end gap-2">
-            <div className="min-w-0 flex-shrink-0">
+      {(hasSummary || isSummaryLoading) && (
+        <div className="space-y-3 px-8 pb-4 pt-1">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-[#5d5a53]">Enhanced notes</p>
+              <p className="mt-0.5 text-[11px] text-[#9b978d]">
+                {isSummaryDirty || isSaving ? 'Saving changes…' : 'All changes saved'}
+              </p>
+            </div>
+            {hasSummary && !isSummaryLoading && (
+              <SummaryUpdaterButtonGroup onCopy={onCopySummary} />
+            )}
+          </div>
+          <div className="min-w-0">
               <SummaryGeneratorButtonGroup
                 modelConfig={modelConfig}
                 setModelConfig={setModelConfig}
@@ -274,25 +273,11 @@ export function SummaryPanel({
                 onOpenModelSettings={onOpenModelSettings}
                 languageSlot={transcripts.length > 0 || hasSummary ? languageSlot : undefined}
               />
-            </div>
-
-            {hasSummary && !isSummaryLoading && (
-              <div className="flex-shrink-0">
-                <SummaryUpdaterButtonGroup
-                  isSaving={isSaving}
-                  isDirty={isSummaryDirty}
-                  onSave={onSaveAll}
-                  onCopy={onCopySummary}
-                />
-              </div>
-            )}
           </div>
+        </div>
       )}
-      </div>
 
-      {notesView === 'raw' ? (
-        <MeetingRawNotesEditor meetingId={meeting.id} />
-      ) : isSummaryLoading ? (
+      {isSummaryLoading ? (
         <div className="flex items-center justify-center flex-1">
           <div className="text-center">
             <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
@@ -308,7 +293,7 @@ export function SummaryPanel({
         />
       ) : (
         <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0">
-          <div className="mx-auto w-full max-w-[900px] px-10 pb-20 pt-6">
+          <div className="meeting-notes-editor mx-auto w-full max-w-[860px] px-10 pb-24 pt-8">
             <BlockNoteSummaryView
               ref={summaryRef}
               summaryData={aiSummary}
@@ -328,11 +313,8 @@ export function SummaryPanel({
               }}
             />
           </div>
-          {summaryStatus !== 'idle' && (
-            <div className={`mt-4 p-4 rounded-lg ${summaryStatus === 'error' ? 'bg-red-100 text-red-700' :
-              summaryStatus === 'completed' ? 'bg-green-100 text-green-700' :
-                'bg-blue-100 text-blue-700'
-              }`}>
+          {summaryStatus === 'error' && (
+            <div className="mx-10 mb-8 mt-4 rounded-xl bg-red-50 p-3 text-red-700">
               <p className="text-sm font-medium">{getSummaryStatusMessage(summaryStatus)}</p>
             </div>
           )}
