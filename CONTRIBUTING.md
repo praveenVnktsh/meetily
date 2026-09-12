@@ -1,6 +1,6 @@
 # Contributing to Meetily
 
-Issues and pull requests are welcome at [github.com/praveenVnktsh/meetily](https://github.com/praveenVnktsh/meetily).
+Issues and pull requests are welcome at [github.com/praveenvnktsh/minutes](https://github.com/praveenvnktsh/minutes).
 
 ## Workflow
 

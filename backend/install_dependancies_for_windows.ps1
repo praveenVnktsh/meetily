@@ -167,7 +167,7 @@ try {
     Write-Host "1. restart your terminal"
     Write-Host "2. Run the following commands:"
     Write-Host "cd Documents"
-    Write-Host "git clone https://github.com/praveenVnktsh/meetily.git"
+    Write-Host "git clone https://github.com/praveenvnktsh/minutes.git"
     Write-Host "cd meetily/backend"
     Write-Host "./build_whisper.cmd"
     Write-Host ""

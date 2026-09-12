@@ -134,7 +134,7 @@
         "updater": {
             "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVFMTcxMjYwM0FERjZCODQKUldTRWE5ODZZQklYN3UzZ0FUQWxsU1NZUDRvWlZhWU5aU0c3V0VvQ0F6SXRTd1dhN3hYTHFuQmYK",
             "endpoints": [
-                "https://github.com/praveenVnktsh/meetily/releases/latest/download/latest.json"
+                "https://github.com/praveenvnktsh/minutes/releases/latest/download/latest.json"
             ]
         }
     }
