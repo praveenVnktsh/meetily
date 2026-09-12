@@ -24,6 +24,7 @@ interface TranscriptButtonGroupProps {
   meetingFolderPath?: string | null;
   onRefetchTranscripts?: () => Promise<void>;
   onOpenSpeakerManager?: () => void;
+  locked?: boolean;
 }
 
 
@@ -35,11 +36,12 @@ export function TranscriptButtonGroup({
   meetingFolderPath,
   onRefetchTranscripts,
   onOpenSpeakerManager,
+  locked = false,
 }: TranscriptButtonGroupProps) {
   const { betaFeatures } = useConfig();
   const [showRetranscribeDialog, setShowRetranscribeDialog] = useState(false);
   const [isIdentifyingSpeakers, setIsIdentifyingSpeakers] = useState(false);
-  const hasMoreActions = Boolean(
+  const hasMoreActions = !locked && Boolean(
     meetingId && (
       (betaFeatures.importAndRetranscribe && meetingFolderPath)
       || (transcriptCount > 0 && (meetingFolderPath || onOpenSpeakerManager))

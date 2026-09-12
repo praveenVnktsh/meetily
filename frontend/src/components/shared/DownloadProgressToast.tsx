@@ -188,7 +188,7 @@ export function useDownloadProgressToast() {
         />
       ),
       {
-        position: 'top-right',
+        position: 'bottom-center',
         id: toastId,
         duration: getDuration(),
       }

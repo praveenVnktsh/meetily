@@ -182,6 +182,22 @@ export const BlockNoteSummaryView = forwardRef<BlockNoteSummaryViewRef, BlockNot
     };
   }, [currentBlocks, handleSave, isDirty, onSave]);
 
+  // Keep the latest save handler reachable from the unmount cleanup so a pending
+  // debounce is flushed when the meeting page goes away instead of being dropped.
+  const handleSaveRef = useRef(handleSave);
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+    isDirtyRef.current = isDirty;
+  }, [handleSave, isDirty]);
+
+  useEffect(() => () => {
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    if (isDirtyRef.current) {
+      void handleSaveRef.current().catch(() => {});
+    }
+  }, []);
+
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     saveSummary: handleSave,

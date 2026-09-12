@@ -49,7 +49,13 @@ export function BlockNotesEditor({
   const latestDocument = useRef(document);
   latestDocument.current = document;
   const changeVersion = useRef(0);
-  const editor = useCreateBlockNote({ initialContent: startingBlocks });
+  const editor = useCreateBlockNote({
+    initialContent: startingBlocks,
+    placeholders: {
+      default: 'Start typing your notes…',
+      emptyDocument: 'Start typing your notes…',
+    },
+  });
 
   useEffect(() => {
     if (!onChange || !editable) return;

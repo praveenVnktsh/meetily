@@ -3,10 +3,36 @@ use crate::database::models::{MeetingModel, Transcript};
 use chrono::Utc;
 use sqlx::{Connection, Error as SqlxError, SqliteConnection, SqlitePool};
 use tracing::{error, info};
+use uuid::Uuid;
 
 pub struct MeetingsRepository;
 
 impl MeetingsRepository {
+    /// Create an empty meeting row. Used so a meeting exists before recording
+    /// starts, letting the workspace own the whole recording lifecycle.
+    pub async fn create_meeting(
+        pool: &SqlitePool,
+        title: &str,
+        folder_path: Option<String>,
+    ) -> Result<String, SqlxError> {
+        let meeting_id = format!("meeting-{}", Uuid::new_v4());
+        let now = Utc::now();
+
+        sqlx::query(
+            "INSERT INTO meetings (id, title, created_at, updated_at, folder_path) VALUES (?, ?, ?, ?, ?)",
+        )
+        .bind(&meeting_id)
+        .bind(title)
+        .bind(now)
+        .bind(now)
+        .bind(&folder_path)
+        .execute(pool)
+        .await?;
+
+        info!("Created empty meeting {} ('{}')", meeting_id, title);
+        Ok(meeting_id)
+    }
+
     pub async fn get_meetings(pool: &SqlitePool) -> Result<Vec<MeetingModel>, sqlx::Error> {
         let meetings =
             sqlx::query_as::<_, MeetingModel>("SELECT * FROM meetings ORDER BY created_at DESC")

@@ -24,6 +24,9 @@ function MeetingDetailsContent() {
   const searchParams = useSearchParams();
   const meetingId = searchParams.get('id');
   const source = searchParams.get('source'); // Check if navigated from recording
+  const recording = searchParams.get('recording'); // Recording started in this workspace
+  const transcribing = searchParams.get('transcribing'); // Background transcription still running
+  const isRecordingFlow = source === 'recording' || recording === '1';
   const { setCurrentMeeting, refetchMeetings } = useSidebar();
   const { isAutoSummary } = useConfig(); // Get auto-summary toggle state
   const router = useRouter();
@@ -305,6 +308,9 @@ function MeetingDetailsContent() {
     initialSummary={summaryResponse}
     meeting={meetingDetails}
     summaryData={meetingSummary}
+    arrivedRecording={recording === '1'}
+    arrivedTranscribing={transcribing === '1'}
+    expectSummary={isRecordingFlow && isAutoSummary}
     shouldAutoGenerate={shouldAutoGenerate}
     onAutoGenerateComplete={() => setShouldAutoGenerate(false)}
     onMeetingUpdated={async () => {

@@ -18,6 +18,11 @@ export interface SaveMeetingResponse {
   meeting_id: string;
 }
 
+export interface CreateMeetingResponse {
+  status: string;
+  meeting_id: string;
+}
+
 export interface Meeting {
   id: string;
   title: string;
@@ -40,13 +45,29 @@ export class StorageService {
     meetingTitle: string,
     transcripts: Transcript[],
     folderPath: string | null,
-    webhookOnComplete = false
+    webhookOnComplete = false,
+    meetingId: string | null = null
   ): Promise<SaveMeetingResponse> {
     return invoke<SaveMeetingResponse>('api_save_transcript', {
       meetingTitle,
       transcripts,
       folderPath,
+      meetingId,
       webhookOnComplete,
+    });
+  }
+
+  /**
+   * Create an empty meeting before recording starts so the recording session
+   * and the meeting workspace share a single id from the beginning.
+   */
+  async createMeeting(
+    meetingTitle: string,
+    folderPath: string | null
+  ): Promise<CreateMeetingResponse> {
+    return invoke<CreateMeetingResponse>('api_create_meeting', {
+      meetingTitle,
+      folderPath,
     });
   }
 

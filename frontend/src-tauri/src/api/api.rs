@@ -30,6 +30,8 @@ pub struct ApiResponse<T> {
 pub struct Meeting {
     pub id: String,
     pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -347,6 +349,7 @@ pub async fn api_get_meetings<R: Runtime>(
                 .map(|m| Meeting {
                     id: m.id,
                     title: m.title,
+                    created_at: Some(m.created_at.0.to_rfc3339()),
                 })
                 .collect();
             Ok(result)
@@ -956,6 +959,32 @@ pub async fn api_save_meeting_title<R: Runtime>(
     }
 }
 
+/// Creates an empty meeting so a recording session can attach to it from the start.
+#[tauri::command]
+pub async fn api_create_meeting<R: Runtime>(
+    _app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_title: String,
+    folder_path: Option<String>,
+) -> Result<serde_json::Value, String> {
+    log_info!(
+        "api_create_meeting called for meeting: {}, folder_path: {:?}",
+        meeting_title,
+        folder_path
+    );
+    let pool = state.db_manager.pool();
+    match MeetingsRepository::create_meeting(pool, &meeting_title, folder_path).await {
+        Ok(meeting_id) => Ok(serde_json::json!({
+            "status": "success",
+            "meeting_id": meeting_id
+        })),
+        Err(e) => {
+            log_error!("Failed to create meeting '{}': {}", meeting_title, e);
+            Err(format!("Failed to create meeting: {}", e))
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn api_save_transcript<R: Runtime>(
     app: AppHandle<R>,
@@ -963,14 +992,16 @@ pub async fn api_save_transcript<R: Runtime>(
     meeting_title: String,
     transcripts: Vec<serde_json::Value>,
     folder_path: Option<String>,
+    meeting_id: Option<String>,
     webhook_on_complete: Option<bool>,
     auth_token: Option<String>,
 ) -> Result<serde_json::Value, String> {
     log_info!(
-        "api_save_transcript called for meeting: {}, transcripts: {}, folder_path: {:?}, auth_token: {}",
+        "api_save_transcript called for meeting: {}, transcripts: {}, folder_path: {:?}, meeting_id: {:?}, auth_token: {}",
         meeting_title,
         transcripts.len(),
         folder_path,
+        meeting_id,
         auth_token.is_some()
     );
 
@@ -1012,6 +1043,7 @@ pub async fn api_save_transcript<R: Runtime>(
         &meeting_title,
         &transcripts_to_save,
         folder_path,
+        meeting_id.as_deref(),
     )
     .await
     {

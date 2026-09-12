@@ -6,15 +6,16 @@ import { TranscriptButtonGroup } from './TranscriptButtonGroup';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 import { SpeakerCorrectionDialog, SpeakerIdentity } from './SpeakerCorrectionDialog';
 
 interface TranscriptPanelProps {
   transcripts: Transcript[];
-  customPrompt: string;
-  onPromptChange: (value: string) => void;
   onCopyTranscript: () => void;
   onOpenMeetingFolder: () => Promise<void>;
   isRecording: boolean;
+  isTranscribing?: boolean;
+  locked?: boolean;
   disableAutoScroll?: boolean;
 
   // Optional pagination props (when using virtualization)
@@ -34,11 +35,11 @@ interface TranscriptPanelProps {
 
 export function TranscriptPanel({
   transcripts,
-  customPrompt,
-  onPromptChange,
   onCopyTranscript,
   onOpenMeetingFolder,
   isRecording,
+  isTranscribing = false,
+  locked = false,
   disableAutoScroll = false,
   usePagination = false,
   segments,
@@ -108,42 +109,41 @@ export function TranscriptPanel({
           meetingFolderPath={meetingFolderPath}
           onRefetchTranscripts={onRefetchTranscripts}
           onOpenSpeakerManager={() => setShowSpeakerDialog(true)}
+          locked={locked}
         />
+        {locked && convertedSegments.length > 0 && (
+          <p className="mt-2 text-[11px] text-[#9b978d]">Transcript is locked while the summary is being generated.</p>
+        )}
       </div>
 
       {/* Transcript content - use virtualized view for better performance */}
-      <div className="mx-auto w-full max-w-[900px] flex-1 overflow-hidden pb-4">
-        <VirtualizedTranscriptView
-          segments={convertedSegments}
-          isRecording={isRecording}
-          isPaused={false}
-          isProcessing={false}
-          isStopping={false}
-          enableStreaming={false}
-          showConfidence={true}
-          disableAutoScroll={disableAutoScroll}
-          hasMore={hasMore}
-          isLoadingMore={isLoadingMore}
-          totalCount={totalCount}
-          loadedCount={loadedCount}
-          onLoadMore={onLoadMore}
-          speakerOptions={speakerOptions}
-          onSpeakerChange={meetingId ? handleSpeakerReassignment : undefined}
-        />
-      </div>
-
-      {/* Optional context stays available without competing with the transcript. */}
-      {!isRecording && convertedSegments.length > 0 && (
-        <div className="border-t border-[#e5e2da] px-8 py-3">
-          <details className="mx-auto w-full max-w-[900px] text-xs text-[#77736a]">
-            <summary className="cursor-pointer select-none hover:text-[#272622]">Add context for the AI notes</summary>
-            <textarea
-              placeholder="People involved, meeting objective, or anything the summary should emphasize…"
-              className="mt-3 min-h-[72px] w-full resize-y rounded-xl border border-[#dedbd2] bg-white px-3 py-2 text-sm text-[#272622] outline-none placeholder:text-[#aaa69b] focus:border-[#aaa69b]"
-              value={customPrompt}
-              onChange={(e) => onPromptChange(e.target.value)}
-            />
-          </details>
+      {isTranscribing && convertedSegments.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 px-8 pb-16 text-center">
+          <Loader2 className="h-6 w-6 animate-spin text-[#8b887f]" />
+          <div>
+            <p className="text-sm font-medium text-[#5d5a53]">Transcribing meeting audio…</p>
+            <p className="mt-1 text-xs text-[#9b978d]">This can take a moment. Your notes are safe and stay editable meanwhile.</p>
+          </div>
+        </div>
+      ) : (
+        <div className="mx-auto w-full max-w-[900px] flex-1 overflow-hidden pb-4">
+          <VirtualizedTranscriptView
+            segments={convertedSegments}
+            isRecording={isRecording}
+            isPaused={false}
+            isProcessing={false}
+            isStopping={false}
+            enableStreaming={false}
+            showConfidence={true}
+            disableAutoScroll={disableAutoScroll}
+            hasMore={hasMore}
+            isLoadingMore={isLoadingMore}
+            totalCount={totalCount}
+            loadedCount={loadedCount}
+            onLoadMore={onLoadMore}
+            speakerOptions={speakerOptions}
+            onSpeakerChange={meetingId && !locked ? handleSpeakerReassignment : undefined}
+          />
         </div>
       )}
 
