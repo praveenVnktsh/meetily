@@ -3634,6 +3634,8 @@ dependencies = [
  "futures",
  "futures-channel",
  "futures-util",
+ "hex",
+ "hmac",
  "infer 0.15.0",
  "lazy_static",
  "log",

@@ -53,6 +53,7 @@ pub mod state;
 pub mod summary;
 pub mod tray;
 pub mod utils;
+pub mod webhooks;
 pub mod whisper_engine;
 
 use audio::{list_audio_devices, AudioDevice, trigger_audio_permission};
@@ -595,6 +596,9 @@ pub fn run() {
             // Initialize transcription queue worker (processes import/retranscribe tasks sequentially)
             audio::transcription_queue::init_queue_worker(&_app.handle());
 
+            // Deliver durable transcription-complete webhooks in the background.
+            webhooks::init_worker(&_app.handle());
+
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
             if let Ok(resource_path) = _app.handle().path().resource_dir() {
@@ -848,6 +852,10 @@ pub fn run() {
             audio::transcription_queue::pause_transcription_task,
             audio::transcription_queue::resume_transcription_task,
             audio::transcription_queue::is_transcription_queue_active,
+            // Transcription-complete webhook integration
+            webhooks::get_webhook_config,
+            webhooks::set_webhook_config,
+            webhooks::test_webhook,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

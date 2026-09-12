@@ -466,6 +466,15 @@ async fn process_import_task<R: Runtime>(app: &AppHandle<R>, task: &Transcriptio
                 },
             );
 
+            if let Err(error) = crate::webhooks::enqueue_transcription_complete(
+                app,
+                &import_result.meeting_id,
+            )
+            .await
+            {
+                warn!("Failed to enqueue import completion webhook: {}", error);
+            }
+
             // Also emit the original import-complete event for sidebar refresh
             let _ = app.emit(
                 "import-complete",
@@ -591,6 +600,15 @@ async fn process_retranscribe_task<R: Runtime>(app: &AppHandle<R>, task: &Transc
                     duration_seconds: retranscription_result.duration_seconds,
                 },
             );
+
+            if let Err(error) = crate::webhooks::enqueue_transcription_complete(
+                app,
+                &retranscription_result.meeting_id,
+            )
+            .await
+            {
+                warn!("Failed to enqueue retranscription completion webhook: {}", error);
+            }
 
             // Also emit the original retranscription-complete event
             let _ = app.emit(
