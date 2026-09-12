@@ -164,7 +164,7 @@ export function TranscriptPanel({
               <PencilLine className="h-7 w-7" />
             </div>
             <h1 className="text-[34px] font-semibold tracking-[-0.04em] text-ink">Ready for your next meeting</h1>
-            <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-[var(--ink-muted)]">Start once, stay present, and jot only what matters. Meetily records quietly and turns the conversation into useful notes afterward.</p>
+            <p className="mx-auto mt-3 max-w-md text-[15px] leading-6 text-[var(--ink-muted)]">Start once, stay present, and jot only what matters. Minutes records quietly and turns the conversation into useful notes afterward.</p>
             <p className="mt-7 text-xs text-[var(--ink-subtle)]">Live transcription is off by default · audio stays on this Mac</p>
           </div>
         </div>

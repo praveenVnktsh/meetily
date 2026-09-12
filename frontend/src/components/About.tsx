@@ -44,13 +44,13 @@ export function About() {
                 <div className="mb-3">
                     <Image
                         src="icon_128x128.png"
-                        alt="Meetily Logo"
+                        alt="Minutes Logo"
                         width={64}
                         height={64}
                         className="mx-auto"
                     />
                 </div>
-                {/* <h1 className="text-xl font-bold text-ink">Meetily</h1> */}
+                {/* <h1 className="text-xl font-bold text-ink">Minutes</h1> */}
                 <span className="text-sm text-ink-muted"> v{currentVersion}</span>
                 <p className="text-medium text-ink-muted mt-1">
                     Real-time notes and summaries that never leave your machine.
@@ -85,7 +85,7 @@ export function About() {
 
             {/* Features Grid - Compact */}
             <div className="space-y-3">
-                <h2 className="text-base font-semibold text-ink">What makes Meetily different</h2>
+                <h2 className="text-base font-semibold text-ink">What makes Minutes different</h2>
                 <div className="grid grid-cols-2 gap-2">
                     <div className="bg-surface-2 rounded p-3 hover:bg-surface-2 transition-colors">
                         <h3 className="font-bold text-sm text-ink mb-1">Privacy-first</h3>

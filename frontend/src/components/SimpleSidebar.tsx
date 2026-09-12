@@ -107,7 +107,7 @@ export default function SimpleSidebar() {
             type="button"
             onClick={() => router.push('/')}
             className="no-drag flex h-7 w-7 items-center justify-center rounded-[10px] bg-brand text-brand-foreground"
-            title="meetily"
+            title="minutes"
           >
             <AudioLines className="h-4 w-4" />
           </button>
@@ -122,11 +122,11 @@ export default function SimpleSidebar() {
         </div>
       ) : (
         <div className="mt-8 flex items-center justify-between px-1">
-          <button type="button" onClick={() => router.push('/')} className="no-drag flex items-center gap-2 text-left" title="meetily">
+          <button type="button" onClick={() => router.push('/')} className="no-drag flex items-center gap-2 text-left" title="minutes">
             <span className="flex h-7 w-7 items-center justify-center rounded-[10px] bg-brand text-brand-foreground">
               <AudioLines className="h-4 w-4" />
             </span>
-            <span className="text-[15px] font-semibold tracking-[-0.02em]">meetily</span>
+            <span className="text-[15px] font-semibold tracking-[-0.02em]">minutes</span>
           </button>
           <button
             type="button"

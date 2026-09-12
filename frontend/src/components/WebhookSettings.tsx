@@ -106,7 +106,7 @@ export function WebhookSettings() {
           type="url"
           value={config.endpoint}
           onChange={event => setConfig(current => ({ ...current, endpoint: event.target.value }))}
-          placeholder="https://hooks.example.com/meetily"
+          placeholder="https://hooks.example.com/minutes"
           className="w-full rounded-md border border-hairline bg-surface-raised px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
         />
         <p className="text-xs text-ink-muted">HTTPS is required, except for localhost development.</p>
@@ -141,7 +141,7 @@ export function WebhookSettings() {
       </div>
 
       <div className="rounded-lg border bg-surface-2 p-4 text-sm text-ink">
-        Payloads contain meeting metadata and a Meetily path, but no transcript or audio. Calendar
+        Payloads contain meeting metadata and a Minutes path, but no transcript or audio. Calendar
         and external-ledger IDs are reserved as nullable fields for the later integration.
       </div>
 

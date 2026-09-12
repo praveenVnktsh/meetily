@@ -104,7 +104,7 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Meetily semantic surface tokens (light) */
+    /* Minutes semantic surface tokens (light) */
     --surface-0: #fbfaf7;
     --surface-1: #f4f2ec;
     --surface-2: #efede7;
@@ -143,7 +143,7 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
-    /* Meetily semantic surface tokens (dark) */
+    /* Minutes semantic surface tokens (dark) */
     --surface-0: #1b1b1b;
     --surface-1: #171717;
     --surface-2: #262626;
@@ -173,6 +173,23 @@
 
   .dark {
     color-scheme: dark;
+  }
+
+  /* Native form controls don't always pick up inherited theme colors. */
+  input,
+  textarea,
+  select {
+    color: var(--ink);
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--ink-subtle);
+  }
+
+  select option {
+    background-color: var(--surface-raised);
+    color: var(--ink);
   }
 
   /* Make the window draggable */
@@ -257,6 +274,34 @@
 
   .bn-default-styles {
     font-family: var(--bn-font-family) !important;
+  }
+
+  /* BlockNote ships its own scoped shadcn vars on .bn-shadcn (dark defaults to
+     near-black text). Re-point them at our dark surface/ink so the document
+     and its menus/toolbars stay legible. */
+  .dark .bn-shadcn {
+    --background: 0 0% 11%;
+    --foreground: 0 0% 93%;
+    --card: 0 0% 13.3%;
+    --card-foreground: 0 0% 93%;
+    --popover: 0 0% 13.7%;
+    --popover-foreground: 0 0% 93%;
+    --primary: 0 0% 93%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 93%;
+    --muted: 0 0% 16%;
+    --muted-foreground: 0 0% 64%;
+    --accent: 0 0% 16%;
+    --accent-foreground: 0 0% 93%;
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 0 0% 55%;
+  }
+
+  .dark .bn-editor,
+  .dark .bn-container .bn-editor {
+    color: var(--ink) !important;
   }
 
   /* Dark theme for BlockNote editors (menus, tooltips, text) */

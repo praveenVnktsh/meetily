@@ -162,7 +162,7 @@ export function PreferenceSettings() {
       <div className="bg-surface-raised rounded-lg border border-hairline p-6 shadow-sm">
         <h3 className="text-lg font-semibold text-ink mb-4">Data Storage Locations</h3>
         <p className="text-sm text-ink-muted mb-6">
-          View and access where Meetily stores your data
+          View and access where Minutes stores your data
         </p>
 
         <div className="space-y-4">

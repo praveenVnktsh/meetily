@@ -97,11 +97,11 @@ export function HomebrewDatabaseDetector({ onImportSuccess, onDecline }: Homebre
           <div className="flex items-center gap-2 mb-1">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <h3 className="text-sm font-semibold text-blue-900">
-              Previous Meetily Installation Detected!
+              Previous Minutes Installation Detected!
             </h3>
           </div>
           <p className="text-sm text-blue-800 mb-2">
-            We found an existing database from your previous Meetily installation (Python backend version).
+            We found an existing database from your previous Minutes installation (Python backend version).
           </p>
           <div className="bg-surface-raised rounded p-2 mb-3">
             <p className="text-xs text-blue-700 font-mono break-all">
