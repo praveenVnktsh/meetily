@@ -8,7 +8,8 @@ export interface Transcript {
   id: string;
   text: string;
   timestamp: string; // Wall-clock time (e.g., "14:30:05")
-  speaker?: 'mic' | 'system';
+  speaker?: string;
+  speaker_id?: string;
   sequence_id?: number;
   chunk_start_time?: number; // Legacy field
   is_partial?: boolean;
@@ -142,5 +143,6 @@ export interface TranscriptSegmentData {
   endTime?: number; // audio_end_time in seconds
   text: string;
   confidence?: number;
-  speaker?: 'mic' | 'system';
+  speaker?: string;
+  speakerId?: string;
 }

@@ -311,7 +311,7 @@ export const TranscriptView: React.FC<TranscriptViewProps> = ({ transcripts, isR
                       ? 'bg-blue-50 text-blue-700'
                       : 'bg-violet-50 text-violet-700'
                   }`}>
-                    {transcript.speaker === 'mic' ? 'You' : 'Others'}
+                    {transcript.speaker === 'mic' ? 'You' : transcript.speaker === 'system' ? 'Others' : transcript.speaker}
                   </span>
                 )}
                 {isStreaming ? (

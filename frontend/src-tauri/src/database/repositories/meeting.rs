@@ -61,11 +61,12 @@ impl MeetingsRepository {
         let mut transaction = conn.begin().await?;
 
         // Get meeting details
-        let meeting: Option<MeetingModel> =
-            sqlx::query_as("SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?")
-                .bind(meeting_id)
-                .fetch_optional(&mut *transaction)
-                .await?;
+        let meeting: Option<MeetingModel> = sqlx::query_as(
+            "SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?",
+        )
+        .bind(meeting_id)
+        .fetch_optional(&mut *transaction)
+        .await?;
 
         if meeting.is_none() {
             transaction.rollback().await?;
@@ -82,17 +83,31 @@ impl MeetingsRepository {
 
             transaction.commit().await?;
 
+            let resolved = crate::audio::speaker_corrections::resolve_transcript_speakers(
+                pool,
+                meeting_id,
+                &transcripts,
+            )
+            .await
+            .map_err(|error| SqlxError::Protocol(error.to_string()))?;
+
             // Convert Transcript to MeetingTranscript
             let meeting_transcripts = transcripts
                 .into_iter()
-                .map(|t| MeetingTranscript {
-                    id: t.id,
-                    text: t.transcript,
-                    timestamp: t.timestamp,
-                    speaker: t.speaker,
-                    audio_start_time: t.audio_start_time,
-                    audio_end_time: t.audio_end_time,
-                    duration: t.duration,
+                .map(|t| {
+                    let speaker = resolved.get(&t.id);
+                    MeetingTranscript {
+                        id: t.id,
+                        text: t.transcript,
+                        timestamp: t.timestamp,
+                        speaker: speaker
+                            .map(|value| value.display_name.clone())
+                            .or(t.speaker),
+                        speaker_id: speaker.map(|value| value.speaker_id.clone()),
+                        audio_start_time: t.audio_start_time,
+                        audio_end_time: t.audio_end_time,
+                        duration: t.duration,
+                    }
                 })
                 .collect::<Vec<_>>();
 
@@ -120,11 +135,12 @@ impl MeetingsRepository {
             ));
         }
 
-        let meeting: Option<MeetingModel> =
-            sqlx::query_as("SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?")
-                .bind(meeting_id)
-                .fetch_optional(pool)
-                .await?;
+        let meeting: Option<MeetingModel> = sqlx::query_as(
+            "SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?",
+        )
+        .bind(meeting_id)
+        .fetch_optional(pool)
+        .await?;
 
         Ok(meeting)
     }
@@ -143,19 +159,17 @@ impl MeetingsRepository {
         }
 
         // Get total count of transcripts for this meeting
-        let total: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM transcripts WHERE meeting_id = ?"
-        )
-        .bind(meeting_id)
-        .fetch_one(pool)
-        .await?;
+        let total: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM transcripts WHERE meeting_id = ?")
+            .bind(meeting_id)
+            .fetch_one(pool)
+            .await?;
 
         // Get paginated transcripts ordered by audio_start_time
         let transcripts = sqlx::query_as::<_, Transcript>(
             "SELECT * FROM transcripts
              WHERE meeting_id = ?
              ORDER BY audio_start_time ASC
-             LIMIT ? OFFSET ?"
+             LIMIT ? OFFSET ?",
         )
         .bind(meeting_id)
         .bind(limit)
