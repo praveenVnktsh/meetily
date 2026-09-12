@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useCallback } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
-import { Copy, FolderOpen, RefreshCw } from 'lucide-react';
+import { Copy, FolderOpen, RefreshCw, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import Analytics from '@/lib/analytics';
 import { RetranscribeDialog } from './RetranscribeDialog';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -29,6 +31,7 @@ export function TranscriptButtonGroup({
 }: TranscriptButtonGroupProps) {
   const { betaFeatures } = useConfig();
   const [showRetranscribeDialog, setShowRetranscribeDialog] = useState(false);
+  const [isIdentifyingSpeakers, setIsIdentifyingSpeakers] = useState(false);
 
   const handleRetranscribeComplete = useCallback(async () => {
     // Refetch transcripts to show the updated data
@@ -36,6 +39,27 @@ export function TranscriptButtonGroup({
       await onRefetchTranscripts();
     }
   }, [onRefetchTranscripts]);
+
+  const handleIdentifySpeakers = useCallback(async () => {
+    if (!meetingId || isIdentifyingSpeakers) return;
+    setIsIdentifyingSpeakers(true);
+    const toastId = toast.loading('Identifying speakers locally…');
+    try {
+      const result = await invoke<{ speaker_count: number }>('run_speaker_diarization', {
+        meetingId,
+        numSpeakers: null,
+      });
+      await onRefetchTranscripts?.();
+      toast.success(
+        `Identified ${result.speaker_count} speaker${result.speaker_count === 1 ? '' : 's'}`,
+        { id: toastId },
+      );
+    } catch (error) {
+      toast.error(`Speaker identification failed: ${String(error)}`, { id: toastId });
+    } finally {
+      setIsIdentifyingSpeakers(false);
+    }
+  }, [isIdentifyingSpeakers, meetingId, onRefetchTranscripts]);
 
   return (
     <div className="flex items-center justify-center w-full gap-2">
@@ -82,6 +106,22 @@ export function TranscriptButtonGroup({
           >
             <RefreshCw className="@[22rem]:mr-2" size={18} />
             <span className="hidden @[22rem]:inline">Enhance</span>
+          </Button>
+        )}
+
+        {meetingId && meetingFolderPath && transcriptCount > 0 && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2 @[22rem]:px-4"
+            onClick={handleIdentifySpeakers}
+            disabled={isIdentifyingSpeakers}
+            title="Identify speakers locally from the saved recording"
+          >
+            <Users className={`@[22rem]:mr-2 ${isIdentifyingSpeakers ? 'animate-pulse' : ''}`} size={18} />
+            <span className="hidden @[22rem]:inline">
+              {isIdentifyingSpeakers ? 'Identifying…' : 'Speakers'}
+            </span>
           </Button>
         )}
       </ButtonGroup>

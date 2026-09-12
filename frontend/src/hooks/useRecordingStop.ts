@@ -324,6 +324,20 @@ export function useRecordingStop(
           console.log('   folder_path:', folderPath);
 
           if (!deferTranscription) {
+            // Enrich the saved transcript in the background. This only updates
+            // speaker labels; a model/download failure cannot damage the audio
+            // or replace the transcript text and timestamps.
+            void invoke<{ speaker_count: number }>('run_speaker_diarization', {
+              meetingId,
+              numSpeakers: null,
+            }).then((result) => {
+              toast.success(
+                `Identified ${result.speaker_count} speaker${result.speaker_count === 1 ? '' : 's'} locally`,
+              );
+            }).catch((error) => {
+              console.warn('Automatic speaker identification skipped:', error);
+            });
+
             window.dispatchEvent(new CustomEvent('meetily:meeting-ready-for-summary', {
               detail: { meetingId },
             }));
