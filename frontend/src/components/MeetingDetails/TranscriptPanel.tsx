@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { SpeakerCorrectionDialog, SpeakerIdentity } from './SpeakerCorrectionDialog';
+import { MeetingLiveNotes } from './MeetingLiveNotes';
 
 interface TranscriptPanelProps {
   transcripts: Transcript[];
@@ -110,6 +111,10 @@ export function TranscriptPanel({
           onOpenSpeakerManager={() => setShowSpeakerDialog(true)}
         />
       </div>
+
+      {meetingId && (
+        <MeetingLiveNotes meetingId={meetingId} segments={convertedSegments} />
+      )}
 
       {/* Transcript content - use virtualized view for better performance */}
       <div className="flex-1 overflow-hidden pb-4">

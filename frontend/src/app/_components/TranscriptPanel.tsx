@@ -3,7 +3,7 @@ import { PermissionWarning } from '@/components/PermissionWarning';
 import { Button } from '@/components/ui/button';
 import { ButtonGroup } from '@/components/ui/button-group';
 import { Switch } from '@/components/ui/switch';
-import { Copy, GlobeIcon } from 'lucide-react';
+import { Copy, FileText, GlobeIcon, PencilLine } from 'lucide-react';
 import { useTranscripts } from '@/contexts/TranscriptContext';
 import { useConfig } from '@/contexts/ConfigContext';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
@@ -17,6 +17,7 @@ import {
   isLiveTranscriptionEnabled,
   LIVE_TRANSCRIPTION_STORAGE_KEY,
 } from '@/lib/liveTranscription';
+import { LiveNotesPad } from '@/components/LiveNotesPad';
 
 /**
  * TranscriptPanel Component
@@ -49,6 +50,11 @@ export function TranscriptPanel({
     if (typeof window === 'undefined') return false;
     return isLiveTranscriptionEnabled(localStorage.getItem(LIVE_TRANSCRIPTION_STORAGE_KEY));
   });
+  const [recordingView, setRecordingView] = useState<'notes' | 'transcript'>('notes');
+
+  useEffect(() => {
+    if (isRecording) setRecordingView('notes');
+  }, [isRecording]);
 
   const handleLiveTranscriptToggle = useCallback(async (enabled: boolean) => {
     // When turning transcription OFF, verify audio saving is enabled
@@ -105,6 +111,24 @@ export function TranscriptPanel({
         <div className="flex flex-col space-y-3">
           <div className="flex  flex-col space-y-2">
             <div className="flex justify-center  items-center space-x-2">
+              {isRecording && (
+                <div className="flex rounded-full bg-stone-100 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setRecordingView('notes')}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${recordingView === 'notes' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+                  >
+                    <PencilLine className="h-3.5 w-3.5" /> Notes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecordingView('transcript')}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium ${recordingView === 'transcript' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-500'}`}
+                  >
+                    <FileText className="h-3.5 w-3.5" /> Transcript
+                  </button>
+                </div>
+              )}
               <ButtonGroup>
                 {transcripts?.length > 0 && (
                   <Button
@@ -162,7 +186,12 @@ export function TranscriptPanel({
         </div>
       )}
 
-      {/* Transcript content */}
+      {/* Notes are the primary recording surface; transcript remains one click away. */}
+      {isRecording && recordingView === 'notes' ? (
+        <div className="min-h-0 flex-1">
+          <LiveNotesPad />
+        </div>
+      ) : (
       <div className="pb-20">
         {isRecording && (!showLiveTranscriptToggle || !liveTranscriptEnabled) ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-4">
@@ -187,6 +216,7 @@ export function TranscriptPanel({
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

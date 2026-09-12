@@ -184,6 +184,14 @@ export function useTranscriptRecovery(): UseTranscriptRecoveryReturn {
 
       const savedMeetingId = saveResponse.meeting_id;
 
+      if (folderPath) {
+        try {
+          await invoke('attach_live_notes', { meetingId: savedMeetingId, folderPath });
+        } catch (error) {
+          console.warn('Could not attach recovered live notes:', error);
+        }
+      }
+
       try {
         await applyPinnedSummaryLanguageToMeeting(savedMeetingId);
       } catch (error) {
