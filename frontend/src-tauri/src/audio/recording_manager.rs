@@ -65,9 +65,15 @@ fn wake_audio_connection_sync(speaker_device_name: &str) -> Result<()> {
 
     let host = cpal::default_host();
 
-    let output_device = host.output_devices()?
-        .find(|d| d.name().ok().as_deref() == Some(speaker_device_name))
-        .ok_or_else(|| anyhow::anyhow!("Output device '{}' not found", speaker_device_name))?;
+    // The default-device lookup is effectively instant on macOS, while a full
+    // HAL enumeration can stall recording startup for tens of seconds. Use the
+    // fast path for the overwhelmingly common default-output case.
+    let output_device = match host.default_output_device() {
+        Some(device) if device.name().ok().as_deref() == Some(speaker_device_name) => device,
+        _ => host.output_devices()?
+            .find(|device| device.name().ok().as_deref() == Some(speaker_device_name))
+            .ok_or_else(|| anyhow::anyhow!("Output device '{}' not found", speaker_device_name))?,
+    };
 
     let config = output_device.default_output_config()?;
     info!("[AUDIO_WAKE] Output config: {} Hz, {} channels",

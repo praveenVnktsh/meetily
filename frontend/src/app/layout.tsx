@@ -2,7 +2,7 @@
 
 import './globals.css'
 import { Source_Sans_3 } from 'next/font/google'
-import Sidebar from '@/components/Sidebar'
+import SimpleSidebar from '@/components/SimpleSidebar'
 import { SidebarProvider } from '@/components/Sidebar/SidebarProvider'
 import MainContent from '@/components/MainContent'
 import AnalyticsProvider from '@/components/AnalyticsProvider'
@@ -260,7 +260,7 @@ function MainAppLayout({
                                 <OnboardingFlow onComplete={handleOnboardingComplete} />
                               ) : (
                                 <div className="flex">
-                                  <Sidebar />
+                                  <SimpleSidebar />
                                   <MainContent>{children}</MainContent>
                                 </div>
                               )}

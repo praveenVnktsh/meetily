@@ -7,7 +7,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { SpeakerCorrectionDialog, SpeakerIdentity } from './SpeakerCorrectionDialog';
-import { MeetingLiveNotes } from './MeetingLiveNotes';
 
 interface TranscriptPanelProps {
   transcripts: Transcript[];
@@ -98,9 +97,9 @@ export function TranscriptPanel({
   }, [transcripts, usePagination, segments]);
 
   return (
-    <div className="flex h-full min-w-0 w-full bg-white flex-col relative @container">
+    <div className="flex h-full min-w-0 w-full bg-[#fbfaf7] flex-col relative @container">
       {/* Title area */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="mx-auto w-full max-w-[900px] px-8 py-3">
         <TranscriptButtonGroup
           transcriptCount={usePagination ? (totalCount ?? convertedSegments.length) : (transcripts?.length || 0)}
           onCopyTranscript={onCopyTranscript}
@@ -112,12 +111,8 @@ export function TranscriptPanel({
         />
       </div>
 
-      {meetingId && (
-        <MeetingLiveNotes meetingId={meetingId} segments={convertedSegments} />
-      )}
-
       {/* Transcript content - use virtualized view for better performance */}
-      <div className="flex-1 overflow-hidden pb-4">
+      <div className="mx-auto w-full max-w-[900px] flex-1 overflow-hidden pb-4">
         <VirtualizedTranscriptView
           segments={convertedSegments}
           isRecording={isRecording}
@@ -137,15 +132,18 @@ export function TranscriptPanel({
         />
       </div>
 
-      {/* Custom prompt input at bottom of transcript section */}
+      {/* Optional context stays available without competing with the transcript. */}
       {!isRecording && convertedSegments.length > 0 && (
-        <div className="p-1 border-t border-gray-200">
-          <textarea
-            placeholder="Add context for AI summary. For example people involved, meeting overview, objective etc..."
-            className="w-full px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm min-h-[80px] resize-y"
-            value={customPrompt}
-            onChange={(e) => onPromptChange(e.target.value)}
-          />
+        <div className="border-t border-[#e5e2da] px-8 py-3">
+          <details className="mx-auto w-full max-w-[900px] text-xs text-[#77736a]">
+            <summary className="cursor-pointer select-none hover:text-[#272622]">Add context for the AI notes</summary>
+            <textarea
+              placeholder="People involved, meeting objective, or anything the summary should emphasize…"
+              className="mt-3 min-h-[72px] w-full resize-y rounded-xl border border-[#dedbd2] bg-white px-3 py-2 text-sm text-[#272622] outline-none placeholder:text-[#aaa69b] focus:border-[#aaa69b]"
+              value={customPrompt}
+              onChange={(e) => onPromptChange(e.target.value)}
+            />
+          </details>
         </div>
       )}
 

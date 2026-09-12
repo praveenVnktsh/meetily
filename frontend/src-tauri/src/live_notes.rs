@@ -23,6 +23,10 @@ pub struct LiveNotesDocument {
     pub meeting_started_at_ms: i64,
     pub updated_at: String,
     pub notes: Vec<LiveNote>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_markdown: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub editor_blocks: Option<serde_json::Value>,
 }
 
 fn notes_path(folder_path: &str) -> Result<PathBuf, String> {
@@ -61,6 +65,13 @@ fn read_document(path: &Path) -> Result<Option<LiveNotesDocument>, String> {
 }
 
 fn notes_markdown(document: &LiveNotesDocument) -> String {
+    if let Some(markdown) = document
+        .raw_markdown
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        return markdown.to_string();
+    }
     document
         .notes
         .iter()
@@ -171,6 +182,15 @@ pub async fn get_meeting_live_notes(
         .transpose()
 }
 
+#[tauri::command]
+pub async fn save_meeting_live_notes(
+    meeting_id: String,
+    document: LiveNotesDocument,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    store_meeting_notes(state.db_manager.pool(), &meeting_id, &document).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +200,8 @@ mod tests {
             version: 1,
             meeting_started_at_ms: 1_750_000_000_000,
             updated_at: "2026-01-01T00:00:00Z".to_string(),
+            raw_markdown: None,
+            editor_blocks: None,
             notes: vec![LiveNote {
                 id: "note-1".to_string(),
                 timestamp_seconds: 65.8,

@@ -140,7 +140,8 @@
 
   /* html, */
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background: #fbfaf7;
     overflow: hidden;
     height: 100%;
   }

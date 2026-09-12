@@ -10,6 +10,7 @@ import { TranscriptPanel } from '@/components/MeetingDetails/TranscriptPanel';
 import { SummaryPanel } from '@/components/MeetingDetails/SummaryPanel';
 import { MeetingDetailsSplitView, type MeetingDetailsTab } from '@/components/MeetingDetails/MeetingDetailsSplitView';
 import { ModelConfig } from '@/components/ModelSettingsModal';
+import { MeetingAssistantPanel } from '@/components/MeetingDetails/MeetingAssistantPanel';
 
 // Custom hooks
 import { useMeetingData } from '@/hooks/meeting-details/useMeetingData';
@@ -59,7 +60,7 @@ export default function PageContent({
   // State
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const isRecording = false;
-  const [activeTab, setActiveTab] = useState<MeetingDetailsTab>('transcript');
+  const [activeTab, setActiveTab] = useState<MeetingDetailsTab>(summaryData ? 'summary' : 'transcript');
 
   // Ref to store the modal open function from SummaryGeneratorButtonGroup
   const openModelSettingsRef = useRef<(() => void) | null>(null);
@@ -190,10 +191,12 @@ export default function PageContent({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="flex flex-col h-screen min-w-0 bg-gray-50"
+      className="flex h-screen min-w-0 flex-col bg-[#fbfaf7]"
     >
       <div className="flex flex-1 min-w-0 overflow-hidden">
         <MeetingDetailsSplitView
+          title={meetingData.meetingTitle}
+          createdAt={meeting.created_at}
           activeTab={activeTab}
           onTabChange={(tab) => {
             manuallySelectedTabMeetingIdsRef.current.add(meeting.id);
@@ -218,6 +221,16 @@ export default function PageContent({
               meetingId={meeting.id}
               meetingFolderPath={meeting.folder_path}
               onRefetchTranscripts={onRefetchTranscripts}
+            />
+          }
+          assistant={
+            <MeetingAssistantPanel
+              meetingId={meeting.id}
+              onNotesUpdated={(markdown) => {
+                meetingData.setAiSummary({ markdown });
+                setActiveTab('summary');
+              }}
+              onTranscriptUpdated={onRefetchTranscripts}
             />
           }
           summary={
