@@ -217,6 +217,9 @@ pub struct AudioCapture {
     channels: u16,
     chunk_counter: Arc<std::sync::atomic::AtomicU64>,
     device_type: DeviceType,
+    // Held (never read) to keep the capture -> pipeline audio channel open for
+    // the lifetime of the capture stream.
+    #[allow(dead_code)]
     recording_sender: Option<mpsc::UnboundedSender<AudioChunk>>,
     needs_resampling: bool,  // Flag if resampling is required
     // CRITICAL FIX: Persistent resampler to preserve energy across chunks
@@ -699,7 +702,6 @@ impl AudioCapture {
 pub struct AudioPipeline {
     receiver: mpsc::UnboundedReceiver<AudioChunk>,
     transcription_sender: mpsc::UnboundedSender<AudioChunk>,
-    state: Arc<RecordingState>,
     mic_vad_processor: ContinuousVadProcessor,
     system_vad_processor: ContinuousVadProcessor,
     sample_rate: u32,
@@ -720,7 +722,6 @@ impl AudioPipeline {
     pub fn new(
         receiver: mpsc::UnboundedReceiver<AudioChunk>,
         transcription_sender: mpsc::UnboundedSender<AudioChunk>,
-        state: Arc<RecordingState>,
         target_chunk_duration_ms: u32,
         sample_rate: u32,
         mic_device_name: String,
@@ -783,7 +784,6 @@ impl AudioPipeline {
         Ok(Self {
             receiver,
             transcription_sender,
-            state,
             mic_vad_processor,
             system_vad_processor,
             sample_rate,
@@ -1019,7 +1019,6 @@ impl AudioPipelineManager {
         let mut pipeline = AudioPipeline::new(
             audio_receiver,
             transcription_sender,
-            state.clone(),
             target_chunk_duration_ms,
             sample_rate,
             mic_device_name,

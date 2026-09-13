@@ -1,4 +1,4 @@
-# Building Meetily from Source
+# Building Minutes from Source
 
 This guide explains source builds on each supported platform. Start with the build notes below, then use the platform instructions that match your machine.
 
@@ -14,7 +14,7 @@ pnpm install --frozen-lockfile
 
 Frozen installation keeps the lockfile and installed dependency set aligned. When intentionally changing dependencies, update and commit `pnpm-lock.yaml`.
 
-- **Linux:** Meetily is built from source; choose acceleration for the environment where you build.
+- **Linux:** Minutes is built from source; choose acceleration for the environment where you build.
 - **Windows packages:** Distribution builds use Vulkan-enabled Whisper and require an AVX2-capable x64 CPU. AVX-512 is not required.
 - **CUDA:** NVIDIA CUDA support requires a compatible source build and CUDA toolchain; the standard Windows installer does not select it automatically.
 
@@ -23,7 +23,7 @@ Frozen installation keeps the lockfile and installed dependency set aligned. Whe
 
 ## 🐧 Building on Linux
 
-This guide helps you build Meetily on Linux with **automatic GPU acceleration**. The build system detects your hardware and configures the best performance automatically.
+This guide helps you build Minutes on Linux with **automatic GPU acceleration**. The build system detects your hardware and configures the best performance automatically.
 
 ---
 
@@ -243,7 +243,7 @@ TAURI_GPU_FEATURE=openblas ./build-gpu.sh
 After successful build:
 
 ```
-src-tauri/target/release/bundle/appimage/Meetily_<version>_amd64.AppImage
+src-tauri/target/release/bundle/appimage/minutes_<version>_amd64.AppImage
 ```
 
 ---

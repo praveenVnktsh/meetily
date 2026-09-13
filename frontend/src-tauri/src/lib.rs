@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex as StdMutex;
+use tauri_plugin_store::StoreExt;
 // Removed unused import
 
 // Performance optimization: Conditional logging macros for hot paths
@@ -28,9 +29,8 @@ macro_rules! perf_trace {
     ($($arg:tt)*) => {};
 }
 
-// Make these macros available to other modules
-pub(crate) use perf_debug;
-pub(crate) use perf_trace;
+/// User-facing product name, used for window titles, notifications, and tray text.
+pub const APP_NAME: &str = "Minutes";
 
 // Re-export async logging macros for external use (removed due to macro conflicts)
 
@@ -51,6 +51,7 @@ pub mod live_notes;
 pub mod meeting_assistant;
 pub mod openrouter;
 pub mod parakeet_engine;
+pub mod shortcuts;
 pub mod state;
 pub mod summary;
 pub mod tray;
@@ -478,6 +479,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .manage(whisper_engine::parallel_commands::ParallelProcessorState::new())
         .manage(Arc::new(RwLock::new(
             None::<notifications::manager::NotificationManager<tauri::Wry>>,
@@ -519,6 +521,20 @@ pub fn run() {
             // Initialize system tray
             if let Err(e) = tray::create_tray(_app.handle()) {
                 log::error!("Failed to create system tray: {}", e);
+            }
+
+            // Register app-wide shortcuts (toggle recording / window)
+            shortcuts::register(_app.handle());
+
+            // Load the custom transcription vocabulary into the Whisper engine.
+            if let Ok(store) = _app.store("store.json") {
+                if let Some(value) = store.get("transcriptionVocabulary") {
+                    if let Some(vocabulary) = value.as_str() {
+                        whisper_engine::whisper_engine::set_transcription_vocabulary(
+                            vocabulary.to_string(),
+                        );
+                    }
+                }
             }
 
             // Initialize notification system with proper defaults
@@ -736,6 +752,11 @@ pub fn run() {
             anthropic::anthropic::get_anthropic_models,
             groq::groq::get_groq_models,
             api::api_get_meetings,
+            api::api_set_meeting_pinned,
+            api::api_set_meeting_archived,
+            api::save_text_export,
+            api::api_get_transcription_vocabulary,
+            api::api_set_transcription_vocabulary,
             api::api_search_transcripts,
             api::api_get_profile,
             api::api_save_profile,

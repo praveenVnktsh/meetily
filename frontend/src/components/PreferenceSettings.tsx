@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Switch } from "./ui/switch"
-import { FolderOpen } from "lucide-react"
+import { FolderOpen, Keyboard } from "lucide-react"
 import { invoke } from "@tauri-apps/api/core"
 import Analytics from "@/lib/analytics"
 import { useConfig, NotificationSettings } from "@/contexts/ConfigContext"
@@ -156,6 +156,31 @@ export function PreferenceSettings() {
           </div>
           <Switch checked={notificationsEnabledValue} onCheckedChange={setNotificationsEnabled} />
         </div>
+      </div>
+
+      {/* Keyboard Shortcuts Section */}
+      <div className="bg-surface-raised rounded-lg border border-hairline p-6 shadow-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Keyboard className="w-5 h-5 text-ink-muted" />
+          <h3 className="text-lg font-semibold text-ink">Keyboard Shortcuts</h3>
+        </div>
+        <p className="text-sm text-ink-muted mb-4">
+          These global shortcuts work even while Minutes is in the background.
+        </p>
+        <ul className="space-y-3">
+          {[
+            { label: 'Open command palette', keys: '⌘ / Ctrl + K' },
+            { label: 'Start or stop recording', keys: '⌘ / Ctrl + Shift + R' },
+            { label: 'Show or hide Minutes', keys: '⌘ / Ctrl + Shift + M' },
+          ].map((shortcut) => (
+            <li key={shortcut.label} className="flex items-center justify-between gap-4">
+              <span className="text-sm text-ink">{shortcut.label}</span>
+              <kbd className="rounded border border-hairline bg-surface-2 px-2 py-1 text-xs font-medium text-ink-muted">
+                {shortcut.keys}
+              </kbd>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Data Storage Locations Section */}

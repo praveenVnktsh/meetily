@@ -1,14 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Archive,
+  ArchiveRestore,
   AudioLines,
   Home,
   Mic,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Pin,
+  PinOff,
   Search,
   Settings,
   Sun,
@@ -16,7 +20,8 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { useSidebar } from '@/components/Sidebar/SidebarProvider';
+import { invoke } from '@tauri-apps/api/core';
+import { useSidebar, type CurrentMeeting } from '@/components/Sidebar/SidebarProvider';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
 import { useShell } from '@/contexts/ShellContext';
 import { useImportDialog } from '@/contexts/ImportDialogContext';
@@ -48,11 +53,13 @@ export default function SimpleSidebar() {
     searchTranscripts,
     searchResults,
     isSearching,
+    refetchMeetings,
   } = useSidebar();
   const { isRecording } = useRecordingState();
   const { openImportDialog } = useImportDialog();
   const { betaFeatures } = useConfig();
   const [query, setQuery] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -60,16 +67,14 @@ export default function SimpleSidebar() {
     return () => clearTimeout(timer);
   }, [query, searchTranscripts]);
 
+  // Focus the search box when the command palette (or another surface) requests it.
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        if (collapsed) toggleCollapsed();
-        setTimeout(() => searchInputRef.current?.focus(), 0);
-      }
+    const onFocusSearch = () => {
+      if (collapsed) toggleCollapsed();
+      setTimeout(() => searchInputRef.current?.focus(), 50);
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('focus-sidebar-search', onFocusSearch);
+    return () => window.removeEventListener('focus-sidebar-search', onFocusSearch);
   }, [collapsed, toggleCollapsed]);
 
   const visibleMeetings = useMemo(() => {
@@ -81,6 +86,80 @@ export default function SimpleSidebar() {
   const openMeeting = (meeting: { id: string; title: string; created_at?: string }) => {
     setCurrentMeeting(meeting);
     router.push(`/meeting-details?id=${meeting.id}`);
+  };
+
+  const togglePinned = async (event: MouseEvent, meeting: CurrentMeeting) => {
+    event.stopPropagation();
+    try {
+      await invoke('api_set_meeting_pinned', { meetingId: meeting.id, pinned: !meeting.pinned });
+      await refetchMeetings();
+    } catch (error) {
+      console.error('Failed to update pin:', error);
+    }
+  };
+
+  const toggleArchived = async (event: MouseEvent, meeting: CurrentMeeting) => {
+    event.stopPropagation();
+    try {
+      await invoke('api_set_meeting_archived', { meetingId: meeting.id, archived: !meeting.archived });
+      await refetchMeetings();
+    } catch (error) {
+      console.error('Failed to update archive:', error);
+    }
+  };
+
+  const searching = Boolean(query.trim());
+  const pinnedMeetings = searching ? [] : visibleMeetings.filter((meeting) => meeting.pinned && !meeting.archived);
+  const regularMeetings = searching ? visibleMeetings : visibleMeetings.filter((meeting) => !meeting.pinned && !meeting.archived);
+  const archivedMeetings = searching ? [] : visibleMeetings.filter((meeting) => meeting.archived);
+  const archivedCount = meetings.filter((meeting) => meeting.archived).length;
+
+  const renderMeetingRow = (meeting: CurrentMeeting) => {
+    const active = Boolean(pathname?.includes('/meeting-details')) && currentMeeting?.id === meeting.id;
+    return (
+      <div
+        key={meeting.id}
+        className={`group flex items-center gap-1 rounded-xl pr-1 transition ${active ? 'bg-surface-2' : 'hover:bg-surface-2'}`}
+      >
+        <button
+          type="button"
+          onClick={() => openMeeting(meeting)}
+          title={meeting.title}
+          className="flex min-w-0 flex-1 items-start gap-2.5 px-3 py-2.5 text-left"
+        >
+          <span className={`relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center ${active ? 'text-[#6ea8fe]' : 'text-ink-subtle'}`}>
+            {active && <span className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#6ea8fe]" />}
+            <Video className="h-4 w-4" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate text-[13px] leading-5 ${active ? 'font-medium text-ink' : 'text-ink-muted'}`}>
+              {meeting.title}
+            </span>
+            <span className="mt-0.5 block truncate text-[11px] text-ink-subtle">
+              {formatMeetingDate(meeting.created_at)}
+            </span>
+          </span>
+        </button>
+        <div className="flex shrink-0 items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+          <button
+            type="button"
+            onClick={(event) => togglePinned(event, meeting)}
+            title={meeting.pinned ? 'Unpin' : 'Pin'}
+            className="rounded p-1 text-ink-subtle hover:bg-surface-1 hover:text-ink"
+          >
+            {meeting.pinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
+          </button>
+          <button
+            type="button"
+            onClick={(event) => toggleArchived(event, meeting)}
+            title={meeting.archived ? 'Unarchive' : 'Archive'}
+            className="rounded p-1 text-ink-subtle hover:bg-surface-1 hover:text-ink"
+          >
+            {meeting.archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const navItems = [
@@ -201,9 +280,9 @@ export default function SimpleSidebar() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search"
-            className="h-10 w-full rounded-xl border border-hairline bg-surface-0 pl-9 pr-14 text-sm text-ink outline-none placeholder:text-ink-subtle focus:border-ink-subtle"
+            className="h-10 w-full rounded-xl border border-hairline bg-surface-0 pl-9 pr-9 text-sm text-ink outline-none placeholder:text-ink-subtle focus:border-ink-subtle"
           />
-          {query ? (
+          {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
@@ -212,10 +291,6 @@ export default function SimpleSidebar() {
             >
               <X className="h-3.5 w-3.5" />
             </button>
-          ) : (
-            <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded border border-hairline px-1.5 py-0.5 text-[10px] text-ink-subtle">
-              ⌘K
-            </kbd>
           )}
         </div>
       )}
@@ -245,35 +320,33 @@ export default function SimpleSidebar() {
             {isSearching && <span className="text-[11px] text-ink-subtle">Searching…</span>}
           </div>
           <nav className="custom-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-            {visibleMeetings.map((meeting) => {
-              const active = Boolean(pathname?.includes('/meeting-details')) && currentMeeting?.id === meeting.id;
-              return (
-                <button
-                  key={meeting.id}
-                  type="button"
-                  onClick={() => openMeeting(meeting)}
-                  title={meeting.title}
-                  className={`group flex w-full items-start gap-2.5 rounded-xl px-3 py-2.5 text-left transition ${active ? 'bg-surface-2' : 'hover:bg-surface-2'}`}
-                >
-                  <span className={`relative mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center ${active ? 'text-[#6ea8fe]' : 'text-ink-subtle'}`}>
-                    {active && <span className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#6ea8fe]" />}
-                    <Video className="h-4 w-4" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className={`block truncate text-[13px] leading-5 ${active ? 'font-medium text-ink' : 'text-ink-muted'}`}>
-                      {meeting.title}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-ink-subtle">
-                      {formatMeetingDate(meeting.created_at)}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
-            {!isSearching && visibleMeetings.length === 0 && (
+            {pinnedMeetings.length > 0 && (
+              <>
+                <p className="px-3 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">Pinned</p>
+                {pinnedMeetings.map(renderMeetingRow)}
+              </>
+            )}
+            {regularMeetings.map(renderMeetingRow)}
+            {showArchived && archivedMeetings.length > 0 && (
+              <>
+                <p className="px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-subtle">Archived</p>
+                {archivedMeetings.map(renderMeetingRow)}
+              </>
+            )}
+            {!isSearching && regularMeetings.length === 0 && pinnedMeetings.length === 0 && !(showArchived && archivedMeetings.length > 0) && (
               <p className="px-3 py-6 text-center text-xs leading-5 text-ink-subtle">Your meetings will appear here.</p>
             )}
           </nav>
+          {(archivedCount > 0 || showArchived) && (
+            <button
+              type="button"
+              onClick={() => setShowArchived((previous) => !previous)}
+              className="mt-1 flex h-9 w-full items-center gap-2 rounded-xl px-3 text-xs text-ink-subtle transition hover:bg-surface-2 hover:text-ink"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              {showArchived ? 'Hide archived' : `Show archived (${archivedCount})`}
+            </button>
+          )}
         </>
       )}
 

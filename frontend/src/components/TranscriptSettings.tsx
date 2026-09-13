@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 import { Button } from './ui/button';
 import { Label } from './ui/label';
 import { Eye, EyeOff, Lock, Unlock } from 'lucide-react';
@@ -27,6 +28,27 @@ export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelCo
     const [isApiKeyLocked, setIsApiKeyLocked] = useState<boolean>(true);
     const [isLockButtonVibrating, setIsLockButtonVibrating] = useState<boolean>(false);
     const [uiProvider, setUiProvider] = useState<TranscriptModelProps['provider']>(transcriptModelConfig.provider);
+    const [vocabulary, setVocabulary] = useState<string>('');
+    const [savedVocabulary, setSavedVocabulary] = useState<string>('');
+
+    useEffect(() => {
+        invoke('api_get_transcription_vocabulary')
+            .then((value) => {
+                const text = (value as string) || '';
+                setVocabulary(text);
+                setSavedVocabulary(text);
+            })
+            .catch((err) => console.error('Failed to load transcription vocabulary:', err));
+    }, []);
+
+    const handleSaveVocabulary = async () => {
+        try {
+            await invoke('api_set_transcription_vocabulary', { vocabulary });
+            setSavedVocabulary(vocabulary);
+        } catch (err) {
+            console.error('Failed to save transcription vocabulary:', err);
+        }
+    };
 
     // Sync uiProvider when backend config changes (e.g., after model selection or initial load)
     useEffect(() => {
@@ -169,6 +191,34 @@ export function TranscriptSettings({ transcriptModelConfig, setTranscriptModelCo
                                 onModelSelect={handleParakeetModelSelect}
                                 autoSave={true}
                             />
+                        </div>
+                    )}
+
+                    {uiProvider === 'localWhisper' && (
+                        <div className="mt-6">
+                            <Label className="block text-sm font-medium text-ink mb-1">
+                                Custom vocabulary
+                            </Label>
+                            <p className="text-xs text-ink-muted mb-2 mx-1">
+                                Names, acronyms, and product terms to bias Whisper. Separate with commas.
+                            </p>
+                            <Textarea
+                                className="mx-1 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                                rows={3}
+                                value={vocabulary}
+                                onChange={(e) => setVocabulary(e.target.value)}
+                                placeholder="e.g. Minutes, OKR, Kubernetes, Acme Corp"
+                            />
+                            <div className="mt-2 mx-1">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handleSaveVocabulary}
+                                    disabled={vocabulary === savedVocabulary}
+                                >
+                                    Save vocabulary
+                                </Button>
+                            </div>
                         </div>
                     )}
 

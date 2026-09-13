@@ -15,6 +15,33 @@ use tokio::io::AsyncWriteExt;
 use crate::config::WHISPER_MODEL_CATALOG;
 use super::acceleration::{whisper_context_acceleration_for, WhisperCompiledBackend};
 
+/// User-provided vocabulary (names, acronyms, product terms) fed to Whisper as
+/// an initial prompt to bias recognition. Empty by default.
+static TRANSCRIPTION_VOCABULARY: std::sync::RwLock<String> = std::sync::RwLock::new(String::new());
+
+/// Replace the active transcription vocabulary.
+pub fn set_transcription_vocabulary(vocabulary: String) {
+    if let Ok(mut guard) = TRANSCRIPTION_VOCABULARY.write() {
+        *guard = vocabulary;
+    }
+}
+
+/// Current transcription vocabulary, trimmed.
+pub fn transcription_vocabulary() -> String {
+    TRANSCRIPTION_VOCABULARY
+        .read()
+        .map(|guard| guard.trim().to_string())
+        .unwrap_or_default()
+}
+
+/// Set the initial prompt on Whisper params when a vocabulary is configured.
+fn apply_initial_prompt(params: &mut FullParams) {
+    let vocabulary = transcription_vocabulary();
+    if !vocabulary.is_empty() {
+        params.set_initial_prompt(&vocabulary);
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ModelStatus {
     Available,
@@ -574,6 +601,7 @@ impl WhisperEngine {
         };
         params.set_language(language_code);
         params.set_translate(should_translate);
+        apply_initial_prompt(&mut params);
 
         // CRITICAL: Disable timestamp tokens to prevent whisper.cpp chunking heuristics
         // The "single timestamp ending - skip entire chunk" optimization incorrectly discards
@@ -691,6 +719,7 @@ impl WhisperEngine {
         };
         params.set_language(language_code);
         params.set_translate(should_translate);
+        apply_initial_prompt(&mut params);
 
         // CRITICAL: Disable timestamp tokens to prevent whisper.cpp chunking heuristics
         // The "single timestamp ending - skip entire chunk" optimization incorrectly discards

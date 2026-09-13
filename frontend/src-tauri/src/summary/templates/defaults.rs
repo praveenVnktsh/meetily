@@ -11,7 +11,9 @@ pub const STANDARD_MEETING: &str = include_str!("../../../templates/standard_mee
 
 /// Registry of all built-in templates
 ///
-/// Maps template identifiers to their embedded JSON content
+/// Maps template identifiers to their embedded JSON content. Currently exercised
+/// by the template tests and kept alongside the other built-in template helpers.
+#[allow(dead_code)]
 pub fn get_builtin_templates() -> Vec<(&'static str, &'static str)> {
     vec![
         ("daily_standup", DAILY_STANDUP),

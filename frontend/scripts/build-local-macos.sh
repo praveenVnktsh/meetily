@@ -19,7 +19,7 @@ cargo build --manifest-path "$REPO_DIR/Cargo.toml" --release -p llama-helper --f
 mkdir -p "$SIDECAR_DIR"
 cp "$REPO_DIR/target/release/llama-helper" "$SIDECAR_DIR/llama-helper-$TARGET_TRIPLE"
 
-echo "Building the local Meetily app..."
+echo "Building the local Minutes app..."
 cd "$FRONTEND_DIR"
 bunx tauri build \
   --bundles app \
@@ -27,4 +27,4 @@ bunx tauri build \
   --config '{"build":{"beforeBuildCommand":"bun run build"},"bundle":{"createUpdaterArtifacts":false}}' \
   --features metal
 
-echo "Local app: $REPO_DIR/target/release/bundle/macos/meetily.app"
+echo "Local app: $REPO_DIR/target/release/bundle/macos/minutes.app"

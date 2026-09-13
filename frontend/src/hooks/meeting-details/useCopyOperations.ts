@@ -105,63 +105,56 @@ export function useCopyOperations({
     });
   }, [meeting, meetingTitle, fetchAllTranscripts]);
 
-  // Copy summary to clipboard
-  const handleCopySummary = useCallback(async () => {
-    if (!hasVisibleSummaryContent(aiSummary)) {
-      toast.error('No summary content available to copy');
-      return;
-    }
+  // Build the summary as Markdown, preferring the live editor content.
+  const buildSummaryMarkdown = useCallback(async (): Promise<string> => {
+    if (!hasVisibleSummaryContent(aiSummary)) return '';
+
     try {
       let summaryMarkdown = '';
 
-      console.log('🔍 Copy Summary - Starting...');
-
       // Try to get markdown from BlockNote editor first
       if (blockNoteSummaryRef.current?.getMarkdown) {
-        console.log('📝 Trying to get markdown from ref...');
         summaryMarkdown = await blockNoteSummaryRef.current.getMarkdown();
-        console.log('📝 Got markdown from ref, length:', summaryMarkdown.length);
       }
 
       // Fallback: Check if aiSummary has markdown property
       if (!summaryMarkdown && aiSummary && typeof aiSummary.markdown === 'string') {
-        console.log('📝 Using markdown from aiSummary');
         summaryMarkdown = aiSummary.markdown;
-        console.log('📝 Markdown from aiSummary, length:', summaryMarkdown.length);
       }
 
       // Fallback: Check for legacy format
       if (!summaryMarkdown && aiSummary) {
-        console.log('📝 Converting legacy format to markdown');
-        const sections = Object.entries(aiSummary)
-          .filter(([key]) => {
-            // Skip non-section keys
-            return key !== 'markdown' && key !== 'summary_json' && key !== '_section_order' && key !== 'MeetingName';
-          })
+        summaryMarkdown = Object.entries(aiSummary)
+          .filter(([key]) => key !== 'markdown' && key !== 'summary_json' && key !== '_section_order' && key !== 'MeetingName')
           .map(([, section]) => {
             if (section && typeof section === 'object' && 'title' in section && 'blocks' in section) {
-              const sectionTitle = `## ${section.title}\n\n`;
-              const sectionContent = section.blocks
-                .map((block: any) => `- ${block.content}`)
-                .join('\n');
+              const typed = section as { title: string; blocks: Array<{ content: string }> };
+              const sectionTitle = `## ${typed.title}\n\n`;
+              const sectionContent = typed.blocks.map((block) => `- ${block.content}`).join('\n');
               return sectionTitle + sectionContent;
             }
             return '';
           })
-          .filter(s => s.trim())
+          .filter((section) => section.trim())
           .join('\n\n');
-        summaryMarkdown = sections;
-        console.log('📝 Converted legacy format, length:', summaryMarkdown.length);
       }
 
-      // If still no summary content, show message
-      if (!summaryMarkdown.trim()) {
-        console.error('❌ No summary content available to copy');
-        toast.error('No summary content available to copy');
-        return;
-      }
+      return summaryMarkdown.trim();
+    } catch (error) {
+      console.error('❌ Failed to build summary markdown:', error);
+      return '';
+    }
+  }, [aiSummary, blockNoteSummaryRef]);
 
-      // Build metadata header
+  // Copy summary to clipboard
+  const handleCopySummary = useCallback(async () => {
+    const summaryMarkdown = await buildSummaryMarkdown();
+    if (!summaryMarkdown) {
+      toast.error('No summary content available to copy');
+      return;
+    }
+
+    try {
       const header = `# Meeting Summary: ${meetingTitle}\n\n`;
       const metadata = `**Meeting ID:** ${meeting.id}\n**Date:** ${new Date(meeting.created_at).toLocaleDateString('en-US', {
         year: 'numeric',
@@ -177,13 +170,9 @@ export function useCopyOperations({
         minute: '2-digit'
       })}\n\n---\n\n`;
 
-      const fullMarkdown = header + metadata + summaryMarkdown;
-      await navigator.clipboard.writeText(fullMarkdown);
-
-      console.log('✅ Successfully copied to clipboard!');
+      await navigator.clipboard.writeText(header + metadata + summaryMarkdown);
       toast.success("Summary copied to clipboard");
 
-      // Track copy analytics
       await Analytics.trackCopy('summary', {
         meeting_id: meeting.id,
         has_markdown: (!!aiSummary && 'markdown' in aiSummary).toString()
@@ -192,10 +181,72 @@ export function useCopyOperations({
       console.error('❌ Failed to copy summary:', error);
       toast.error("Failed to copy summary");
     }
-  }, [aiSummary, meetingTitle, meeting, blockNoteSummaryRef]);
+  }, [buildSummaryMarkdown, aiSummary, meetingTitle, meeting]);
+
+  // Export the meeting (title, summary, transcript) as a Markdown file.
+  const handleExportMarkdown = useCallback(async () => {
+    try {
+      const [summaryMarkdown, allTranscripts] = await Promise.all([
+        buildSummaryMarkdown(),
+        fetchAllTranscripts(meeting.id),
+      ]);
+
+      if (!summaryMarkdown && allTranscripts.length === 0) {
+        toast.error('Nothing to export yet');
+        return;
+      }
+
+      const lines: string[] = [`# ${meetingTitle || meeting.title || 'Untitled meeting'}`, ''];
+      if (meeting.created_at) {
+        lines.push(`_${new Date(meeting.created_at).toLocaleString()}_`, '');
+      }
+
+      if (summaryMarkdown) {
+        lines.push('## Summary', '', summaryMarkdown, '');
+      }
+
+      if (allTranscripts.length > 0) {
+        const formatTime = (seconds: number | undefined, fallback: string): string => {
+          if (seconds === undefined) return fallback;
+          const totalSecs = Math.floor(seconds);
+          const mins = Math.floor(totalSecs / 60);
+          const secs = totalSecs % 60;
+          return `[${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}]`;
+        };
+
+        lines.push('## Transcript', '');
+        for (const segment of allTranscripts) {
+          const speaker = segment.speaker
+            ? ` **${segment.speaker === 'mic' ? 'You' : segment.speaker === 'system' ? 'Others' : segment.speaker}**`
+            : '';
+          lines.push(`- ${formatTime(segment.audio_start_time, segment.timestamp)}${speaker} ${segment.text}`);
+        }
+        lines.push('');
+      }
+
+      const safeTitle = (meetingTitle || meeting.title || 'meeting')
+        .replace(/[^\w\- ]+/g, '')
+        .trim()
+        .replace(/\s+/g, '-') || 'meeting';
+      const stamp = new Date().toISOString().slice(0, 10);
+      const fileName = `${safeTitle}-${stamp}.md`;
+
+      const path = await invokeTauri('save_text_export', { fileName, contents: lines.join('\n') }) as string;
+      toast.success('Meeting exported', { description: path });
+
+      await Analytics.trackCopy('summary', {
+        meeting_id: meeting.id,
+        has_markdown: (!!summaryMarkdown).toString()
+      });
+    } catch (error) {
+      console.error('❌ Failed to export meeting:', error);
+      toast.error('Failed to export meeting');
+    }
+  }, [meeting, meetingTitle, buildSummaryMarkdown, fetchAllTranscripts]);
 
   return {
     handleCopyTranscript,
     handleCopySummary,
+    handleExportMarkdown,
   };
 }

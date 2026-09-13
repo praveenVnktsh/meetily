@@ -88,7 +88,7 @@ impl MeetingsRepository {
 
         // Get meeting details
         let meeting: Option<MeetingModel> = sqlx::query_as(
-            "SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?",
+            "SELECT id, title, created_at, updated_at, folder_path, pinned, archived FROM meetings WHERE id = ?",
         )
         .bind(meeting_id)
         .fetch_optional(&mut *transaction)
@@ -162,7 +162,7 @@ impl MeetingsRepository {
         }
 
         let meeting: Option<MeetingModel> = sqlx::query_as(
-            "SELECT id, title, created_at, updated_at, folder_path FROM meetings WHERE id = ?",
+            "SELECT id, title, created_at, updated_at, folder_path, pinned, archived FROM meetings WHERE id = ?",
         )
         .bind(meeting_id)
         .fetch_optional(pool)
@@ -268,6 +268,52 @@ impl MeetingsRepository {
 
         transaction.commit().await?;
         Ok(true)
+    }
+
+    /// Pin (favorite) or unpin a meeting.
+    pub async fn set_meeting_pinned(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        pinned: bool,
+    ) -> Result<bool, SqlxError> {
+        Self::set_meeting_flag(pool, meeting_id, "pinned", pinned).await
+    }
+
+    /// Archive or unarchive a meeting.
+    pub async fn set_meeting_archived(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        archived: bool,
+    ) -> Result<bool, SqlxError> {
+        Self::set_meeting_flag(pool, meeting_id, "archived", archived).await
+    }
+
+    /// Shared implementation for boolean meeting flags.
+    ///
+    /// `column` is always one of this module's own constants, never user input.
+    async fn set_meeting_flag(
+        pool: &SqlitePool,
+        meeting_id: &str,
+        column: &str,
+        value: bool,
+    ) -> Result<bool, SqlxError> {
+        if meeting_id.trim().is_empty() {
+            return Err(SqlxError::Protocol(
+                "meeting_id cannot be empty".to_string(),
+            ));
+        }
+
+        let query = format!("UPDATE meetings SET {column} = ?, updated_at = ? WHERE id = ?");
+        let now = Utc::now().naive_utc();
+
+        let result = sqlx::query(&query)
+            .bind(value as i64)
+            .bind(now)
+            .bind(meeting_id)
+            .execute(pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 }
 

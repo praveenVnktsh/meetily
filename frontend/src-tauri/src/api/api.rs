@@ -32,6 +32,10 @@ pub struct Meeting {
     pub title: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created_at: Option<String>,
+    #[serde(default)]
+    pub pinned: bool,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -350,6 +354,8 @@ pub async fn api_get_meetings<R: Runtime>(
                     id: m.id,
                     title: m.title,
                     created_at: Some(m.created_at.0.to_rfc3339()),
+                    pinned: m.pinned,
+                    archived: m.archived,
                 })
                 .collect();
             Ok(result)
@@ -359,6 +365,96 @@ pub async fn api_get_meetings<R: Runtime>(
             Err(e.to_string())
         }
     }
+}
+
+#[tauri::command]
+pub async fn api_set_meeting_pinned<R: Runtime>(
+    _app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+    pinned: bool,
+) -> Result<bool, String> {
+    MeetingsRepository::set_meeting_pinned(state.db_manager.pool(), &meeting_id, pinned)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn api_set_meeting_archived<R: Runtime>(
+    _app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+    archived: bool,
+) -> Result<bool, String> {
+    MeetingsRepository::set_meeting_archived(state.db_manager.pool(), &meeting_id, archived)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Write a text export (e.g. Markdown) to the user's Downloads folder.
+///
+/// Returns the absolute path that was written. The filename is sanitized so the
+/// frontend can pass a human-readable title without worrying about separators.
+#[tauri::command]
+pub async fn save_text_export<R: Runtime>(
+    app: AppHandle<R>,
+    file_name: String,
+    contents: String,
+) -> Result<String, String> {
+    use tauri::Manager;
+
+    let dir = app
+        .path()
+        .download_dir()
+        .or_else(|_| app.path().document_dir())
+        .map_err(|e| format!("Could not resolve a save directory: {}", e))?;
+
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+
+    let sanitized: String = file_name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | ' ') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let sanitized = sanitized.trim();
+    let sanitized = if sanitized.is_empty() { "meeting-export.md" } else { sanitized };
+
+    let path = dir.join(sanitized);
+    std::fs::write(&path, contents).map_err(|e| e.to_string())?;
+
+    log_info!("Saved text export to {}", path.display());
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// Read the current custom transcription vocabulary.
+#[tauri::command]
+pub async fn api_get_transcription_vocabulary<R: Runtime>(
+    _app: AppHandle<R>,
+) -> Result<String, String> {
+    Ok(crate::whisper_engine::whisper_engine::transcription_vocabulary())
+}
+
+/// Persist and activate a custom transcription vocabulary.
+#[tauri::command]
+pub async fn api_set_transcription_vocabulary<R: Runtime>(
+    app: AppHandle<R>,
+    vocabulary: String,
+) -> Result<(), String> {
+    crate::whisper_engine::whisper_engine::set_transcription_vocabulary(vocabulary.clone());
+
+    let store = app.store("store.json").map_err(|e| e.to_string())?;
+    store.set(
+        "transcriptionVocabulary",
+        serde_json::Value::String(vocabulary),
+    );
+    store.save().map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

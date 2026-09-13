@@ -31,6 +31,7 @@ import { AutoSummaryProvider } from '@/components/AutoSummaryProvider'
 import { usePathname } from 'next/navigation'
 import { ShellProvider } from '@/contexts/ShellContext'
 import { ThemedToaster } from '@/components/ThemedToaster'
+import { CommandPalette } from '@/components/CommandPalette'
 
 
 const sourceSans3 = Source_Sans_3({
@@ -274,6 +275,7 @@ function MainAppLayout({
                                   </div>
                                 )}
                                 <ThemedToaster />
+                                <CommandPalette />
                               </ShellProvider>
                               {/* Import audio overlay and dialog */}
                               <ImportDropOverlay visible={showDropOverlay} />

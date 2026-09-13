@@ -14,6 +14,12 @@ const nextConfig = {
   basePath: '',
   assetPrefix: '/',
 
+  // Strip debug logging from production bundles while keeping real errors.
+  compiler: {
+    removeConsole:
+      process.env.NODE_ENV === 'production' ? { exclude: ['error', 'warn'] } : false,
+  },
+
   // Add webpack configuration for Tauri
   webpack: (config, { isServer }) => {
     if (!isServer) {

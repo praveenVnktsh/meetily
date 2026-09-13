@@ -196,6 +196,9 @@ impl HardwareProfile {
         Self::has_windows_vulkan_loader(Path::new(r"C:\Windows"))
     }
 
+    // Only reached from the Windows-only runtime probe (and the unit tests), so it
+    // reads as dead code on other platforms.
+    #[cfg_attr(not(target_os = "windows"), allow(dead_code))]
     fn has_windows_vulkan_loader(system_root: &Path) -> bool {
         system_root.join("System32").join("vulkan-1.dll").is_file()
     }

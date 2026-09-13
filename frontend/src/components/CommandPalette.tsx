@@ -1,0 +1,135 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  FileText,
+  Home,
+  Import,
+  Mic,
+  Search,
+  Settings,
+  SunMoon,
+} from 'lucide-react';
+import {
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+  CommandShortcut,
+} from '@/components/ui/command';
+import { useSidebar } from '@/components/Sidebar/SidebarProvider';
+import { useImportDialog } from '@/contexts/ImportDialogContext';
+import { useShell } from '@/contexts/ShellContext';
+
+const RECENT_MEETINGS_SHOWN = 8;
+
+/**
+ * Cmd/Ctrl+K command palette for jumping to meetings and common actions.
+ */
+export function CommandPalette() {
+  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const { meetings, handleRecordingToggle } = useSidebar();
+  const { openImportDialog } = useImportDialog();
+  const { toggleTheme } = useShell();
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 'k') {
+        return;
+      }
+
+      // Leave Cmd/Ctrl+K to the focused editor (link/command shortcuts) unless
+      // the palette itself is open and should toggle closed.
+      const target = event.target as HTMLElement | null;
+      const isEditable = !!target && (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      );
+      if (isEditable && !open) {
+        return;
+      }
+
+      event.preventDefault();
+      setOpen((previous) => !previous);
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
+
+  const runCommand = (action: () => void) => {
+    setOpen(false);
+    // Let the dialog close before navigating or opening another dialog.
+    setTimeout(action, 0);
+  };
+
+  return (
+    <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandInput placeholder="Search meetings or type a command..." />
+      <CommandList>
+        <CommandEmpty>No results found.</CommandEmpty>
+
+        <CommandGroup heading="Actions">
+          <CommandItem onSelect={() => runCommand(handleRecordingToggle)}>
+            <Mic />
+            Start recording
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => router.push('/'))}>
+            <Home />
+            Go to Home
+          </CommandItem>
+          <CommandItem
+            onSelect={() =>
+              runCommand(() => window.dispatchEvent(new CustomEvent('focus-sidebar-search')))
+            }
+          >
+            <Search />
+            Search meetings
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => router.push('/settings'))}>
+            <Settings />
+            Open Settings
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => openImportDialog())}>
+            <Import />
+            Import audio
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(toggleTheme)}>
+            <SunMoon />
+            Toggle theme
+          </CommandItem>
+        </CommandGroup>
+
+        {meetings.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Recent meetings">
+              {meetings.slice(0, RECENT_MEETINGS_SHOWN).map((meeting) => (
+                <CommandItem
+                  key={meeting.id}
+                  value={`${meeting.title} ${meeting.id}`}
+                  onSelect={() =>
+                    runCommand(() => router.push(`/meeting-details?id=${meeting.id}`))
+                  }
+                >
+                  <FileText />
+                  <span className="truncate">{meeting.title || 'Untitled meeting'}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
+      </CommandList>
+
+      <div className="flex items-center justify-end border-t px-3 py-2">
+        <CommandShortcut>⌘ / Ctrl + K</CommandShortcut>
+      </div>
+    </CommandDialog>
+  );
+}

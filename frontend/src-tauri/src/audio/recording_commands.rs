@@ -108,7 +108,7 @@ static TRANSCRIPT_LISTENER_ID: Mutex<Option<tauri::EventId>> = Mutex::new(None);
 
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str =
     "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
-const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Meetily. If the problem continues, repair or reinstall the app.";
+const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Minutes. If the problem continues, repair or reinstall the app.";
 
 // ============================================================================
 // PUBLIC TYPES
@@ -1115,6 +1115,16 @@ pub async fn stop_recording<R: Runtime>(
 /// Check if recording is active
 pub async fn is_recording() -> bool {
     IS_RECORDING.load(Ordering::SeqCst)
+}
+
+/// Active recording duration in seconds, excluding pauses.
+///
+/// Returns `None` when no recording session is active.
+pub fn current_active_duration_seconds() -> Option<f64> {
+    let manager_guard = RECORDING_MANAGER.lock().unwrap();
+    manager_guard
+        .as_ref()
+        .and_then(|manager| manager.get_active_recording_duration())
 }
 
 /// Get recording statistics

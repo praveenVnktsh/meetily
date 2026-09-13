@@ -1,10 +1,62 @@
 use tauri::{
     Emitter,
     image::Image,
-    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem},
+    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
     tray::TrayIconBuilder,
     AppHandle, Manager, Runtime,
 };
+
+/// How many meetings to surface in the tray's "Recent Meetings" submenu.
+const RECENT_MEETINGS_LIMIT: usize = 5;
+
+/// Last loaded recent meetings, so transient menu rebuilds (pause/resume) keep
+/// showing the list instead of momentarily emptying it.
+static RECENT_MEETINGS_CACHE: std::sync::Mutex<Vec<(String, String)>> =
+    std::sync::Mutex::new(Vec::new());
+
+fn cached_recent_meetings() -> Vec<(String, String)> {
+    RECENT_MEETINGS_CACHE
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_default()
+}
+
+/// Format an elapsed duration as `M:SS`, or `H:MM:SS` once it passes an hour.
+pub fn format_elapsed(total_seconds: u64) -> String {
+    let hours = total_seconds / 3600;
+    let minutes = (total_seconds % 3600) / 60;
+    let seconds = total_seconds % 60;
+    if hours > 0 {
+        format!("{hours}:{minutes:02}:{seconds:02}")
+    } else {
+        format!("{minutes}:{seconds:02}")
+    }
+}
+
+/// Build a tray label like `Sep 11 · Weekly planning` for a recent meeting.
+fn recent_meeting_label(title: &str, created_at: chrono::DateTime<chrono::Utc>) -> String {
+    let when = created_at
+        .with_timezone(&chrono::Local)
+        .format("%b %-d")
+        .to_string();
+    format!("{} · {}", when, truncate_title(title, 40))
+}
+
+/// Shorten a meeting title for display in the tray menu.
+fn truncate_title(title: &str, max_chars: usize) -> String {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return "Untitled meeting".to_string();
+    }
+
+    let mut chars = trimmed.chars();
+    let truncated: String = chars.by_ref().take(max_chars).collect();
+    if chars.next().is_some() {
+        format!("{truncated}…")
+    } else {
+        truncated
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RecordingState {
@@ -34,10 +86,88 @@ pub fn create_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     // Update tray menu with actual recording state after creation
     update_tray_menu(app);
 
+    // Reflect the live recording duration in the menu bar / tooltip
+    start_tray_timer(app);
+
     Ok(())
 }
 
+/// Keep the tray's menu bar title and tooltip in sync with the recording timer.
+///
+/// `set_title` only renders where the platform supports menu-bar text, but the
+/// tooltip update works everywhere. The task idles quietly while not recording.
+pub fn start_tray_timer<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let mut timer_visible = false;
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+
+            let Some(tray) = app.tray_by_id("main-tray") else {
+                continue;
+            };
+
+            if crate::audio::recording_commands::is_recording().await {
+                let Some(seconds) = crate::audio::recording_commands::current_active_duration_seconds() else {
+                    continue;
+                };
+                let elapsed = format_elapsed(seconds as u64);
+                let paused = crate::audio::recording_commands::is_recording_paused().await;
+                let state_text = if paused { "paused" } else { "recording" };
+
+                let _ = tray.set_title(Some(elapsed.clone()));
+                let _ = tray.set_tooltip(Some(format!(
+                    "{} — {} ({})",
+                    crate::APP_NAME,
+                    state_text,
+                    elapsed
+                )));
+                set_recording_window_indicators(&app, true, paused, Some(&elapsed));
+                timer_visible = true;
+            } else if timer_visible {
+                let _ = tray.set_title(None::<&str>);
+                let _ = tray.set_tooltip(Some(tray_tooltip(RecordingState::Stopped)));
+                set_recording_window_indicators(&app, false, false, None);
+                timer_visible = false;
+            }
+        }
+    });
+}
+
+/// Reflect the recording state in the main window title and dock badge.
+fn set_recording_window_indicators<R: Runtime>(
+    app: &AppHandle<R>,
+    recording: bool,
+    paused: bool,
+    elapsed: Option<&str>,
+) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    if recording {
+        let title = if paused {
+            format!("Paused — {}", crate::APP_NAME)
+        } else {
+            match elapsed {
+                Some(elapsed) => format!("● Recording {} — {}", elapsed, crate::APP_NAME),
+                None => format!("● Recording — {}", crate::APP_NAME),
+            }
+        };
+        let _ = window.set_title(&title);
+        let _ = window.set_badge_label(Some("REC".to_string()));
+    } else {
+        let _ = window.set_title(crate::APP_NAME);
+        let _ = window.set_badge_label(None);
+    }
+}
+
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, item_id: &str) {
+    if let Some(meeting_id) = item_id.strip_prefix("recent_meeting:") {
+        open_recent_meeting(app, meeting_id);
+        return;
+    }
+
     match item_id {
         "toggle_recording" => toggle_recording_handler(app),
         "pause_recording" => pause_recording_handler(app),
@@ -55,7 +185,27 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, item_id: &str) {
         _ => {}
     }
 }
-fn toggle_recording_handler<R: Runtime>(app: &AppHandle<R>) {
+/// Open a meeting from the tray's recent list in the main window.
+fn open_recent_meeting<R: Runtime>(app: &AppHandle<R>, meeting_id: &str) {
+    focus_main_window(app);
+
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("Tray: main window unavailable to open recent meeting");
+        return;
+    };
+
+    // Encode the id defensively rather than trusting it to be URL-safe.
+    let id_literal = serde_json::to_string(meeting_id).unwrap_or_else(|_| "\"\"".to_string());
+    let script = format!(
+        "window.location.assign('/meeting-details?id=' + encodeURIComponent({id_literal}))"
+    );
+
+    if let Err(error) = window.eval(script) {
+        log::error!("Tray: failed to open recent meeting: {}", error);
+    }
+}
+
+pub(crate) fn toggle_recording_handler<R: Runtime>(app: &AppHandle<R>) {
     focus_main_window(app);
     let app_clone = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -305,6 +455,11 @@ pub async fn update_tray_menu_async<R: Runtime>(app: &AppHandle<R>) {
     let can_record = check_can_record(app).await;
     log::info!("Tray: can_record: {}", can_record);
 
+    let recent_meetings = load_recent_meetings(app).await;
+    if let Ok(mut cache) = RECENT_MEETINGS_CACHE.lock() {
+        *cache = recent_meetings;
+    }
+
     if let Ok(menu) = build_menu(app, recording_state, can_record) {
         if let Some(tray) = app.tray_by_id("main-tray") {
             let result = tray.set_menu(Some(menu));
@@ -320,13 +475,13 @@ pub async fn update_tray_menu_async<R: Runtime>(app: &AppHandle<R>) {
 
 fn tray_tooltip(state: RecordingState) -> &'static str {
     match state {
-        RecordingState::Stopped => "Meetily is active",
-        RecordingState::Starting => "Meetily is starting a recording",
-        RecordingState::Recording => "Meetily is recording",
-        RecordingState::Pausing => "Meetily is pausing the recording",
-        RecordingState::Paused => "Meetily recording is paused",
-        RecordingState::Resuming => "Meetily is resuming the recording",
-        RecordingState::Stopping => "Meetily is finishing the recording",
+        RecordingState::Stopped => "Minutes is active",
+        RecordingState::Starting => "Minutes is starting a recording",
+        RecordingState::Recording => "Minutes is recording",
+        RecordingState::Pausing => "Minutes is pausing the recording",
+        RecordingState::Paused => "Minutes recording is paused",
+        RecordingState::Resuming => "Minutes is resuming the recording",
+        RecordingState::Stopping => "Minutes is finishing the recording",
     }
 }
 
@@ -393,6 +548,7 @@ fn build_menu<R: Runtime>(
     can_record: bool, // True if recording is allowed (onboarding complete OR transcription model ready)
 ) -> tauri::Result<tauri::menu::Menu<R>> {
     let mut builder = MenuBuilder::new(app);
+    let recent_meetings = cached_recent_meetings();
 
     // If recording is not allowed (during onboarding, no transcription model), show disabled message
     if !can_record {
@@ -457,12 +613,84 @@ fn build_menu<R: Runtime>(
 
     builder
         .item(&PredefinedMenuItem::separator(app)?)
+        .item(&build_recent_meetings_submenu(app, &recent_meetings)?)
+        .item(&PredefinedMenuItem::separator(app)?)
         .item(&MenuItemBuilder::with_id("open_window", "Open Main Window").build(app)?)
         .item(&MenuItemBuilder::with_id("settings", "Settings").build(app)?)
         .item(&MenuItemBuilder::with_id("check_updates", "Check for Updates").build(app)?)
         .item(&PredefinedMenuItem::separator(app)?)
         .item(&MenuItemBuilder::with_id("quit", "Quit").build(app)?)
         .build()
+}
+
+fn build_recent_meetings_submenu<R: Runtime>(
+    app: &AppHandle<R>,
+    recent_meetings: &[(String, String)],
+) -> tauri::Result<tauri::menu::Submenu<R>> {
+    let mut submenu = SubmenuBuilder::new(app, "Recent Meetings");
+
+    if recent_meetings.is_empty() {
+        submenu = submenu.item(
+            &MenuItemBuilder::new("No meetings yet")
+                .enabled(false)
+                .build(app)?,
+        );
+    } else {
+        for (meeting_id, title) in recent_meetings {
+            let item =
+                MenuItemBuilder::with_id(format!("recent_meeting:{meeting_id}"), title).build(app)?;
+            submenu = submenu.item(&item);
+        }
+    }
+
+    submenu.build()
+}
+
+/// Read the most recent meetings for the tray submenu.
+///
+/// Returns an empty list before the database is initialized or on query errors,
+/// so the tray can always render.
+async fn load_recent_meetings<R: Runtime>(app: &AppHandle<R>) -> Vec<(String, String)> {
+    let Some(state) = app.try_state::<crate::state::AppState>() else {
+        return Vec::new();
+    };
+
+    match crate::database::repositories::meeting::MeetingsRepository::get_meetings(
+        state.db_manager.pool(),
+    )
+    .await
+    {
+        Ok(meetings) => meetings
+            .into_iter()
+            .take(RECENT_MEETINGS_LIMIT)
+            .map(|meeting| {
+                let label = recent_meeting_label(&meeting.title, meeting.created_at.0);
+                (meeting.id, label)
+            })
+            .collect(),
+        Err(error) => {
+            log::warn!("Tray: failed to load recent meetings: {}", error);
+            Vec::new()
+        }
+    }
+}
+
+/// Hide the main window when it is frontmost, otherwise bring it forward.
+pub fn toggle_main_window<R: Runtime>(app: &AppHandle<R>) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    let visible = window.is_visible().unwrap_or(false);
+    let minimized = window.is_minimized().unwrap_or(false);
+
+    if visible && !minimized {
+        if let Err(error) = window.hide() {
+            log::error!("Failed to hide main window: {}", error);
+        }
+    } else {
+        focus_main_window(app);
+    }
 }
 
 pub(crate) fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
@@ -489,13 +717,49 @@ pub(crate) fn focus_main_window<R: Runtime>(app: &AppHandle<R>) {
 
 #[cfg(test)]
 mod tests {
-    use super::{tray_icon, tray_tooltip, RecordingState};
+    use super::{
+        format_elapsed, recent_meeting_label, tray_icon, tray_tooltip, truncate_title,
+        RecordingState,
+    };
+    use chrono::TimeZone;
+
+    #[test]
+    fn elapsed_time_uses_compact_under_an_hour() {
+        assert_eq!(format_elapsed(0), "0:00");
+        assert_eq!(format_elapsed(9), "0:09");
+        assert_eq!(format_elapsed(65), "1:05");
+        assert_eq!(format_elapsed(599), "9:59");
+        assert_eq!(format_elapsed(3599), "59:59");
+    }
+
+    #[test]
+    fn elapsed_time_adds_hours_past_sixty_minutes() {
+        assert_eq!(format_elapsed(3600), "1:00:00");
+        assert_eq!(format_elapsed(3661), "1:01:01");
+        assert_eq!(format_elapsed(86399), "23:59:59");
+    }
+
+    #[test]
+    fn meeting_titles_are_truncated_for_the_tray() {
+        assert_eq!(truncate_title("  Standup  ", 40), "Standup");
+        assert_eq!(truncate_title("", 40), "Untitled meeting");
+        assert_eq!(truncate_title("Weekly planning", 6), "Weekly…");
+    }
+
+    #[test]
+    fn recent_meeting_label_appends_the_title() {
+        let created = chrono::Utc
+            .with_ymd_and_hms(2026, 9, 11, 12, 0, 0)
+            .unwrap();
+        let label = recent_meeting_label("Weekly planning", created);
+        assert!(label.ends_with(" · Weekly planning"), "unexpected label: {label}");
+    }
 
     #[test]
     fn tray_status_distinguishes_idle_recording_and_paused_states() {
-        assert_eq!(tray_tooltip(RecordingState::Stopped), "Meetily is active");
-        assert_eq!(tray_tooltip(RecordingState::Recording), "Meetily is recording");
-        assert_eq!(tray_tooltip(RecordingState::Paused), "Meetily recording is paused");
+        assert_eq!(tray_tooltip(RecordingState::Stopped), "Minutes is active");
+        assert_eq!(tray_tooltip(RecordingState::Recording), "Minutes is recording");
+        assert_eq!(tray_tooltip(RecordingState::Paused), "Minutes recording is paused");
 
         let (idle_icon, idle_is_template) = tray_icon(RecordingState::Stopped);
         let (recording_icon, recording_is_template) = tray_icon(RecordingState::Recording);

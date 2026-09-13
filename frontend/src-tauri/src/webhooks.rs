@@ -160,7 +160,7 @@ pub async fn test_webhook<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
         "created_at": Utc::now().to_rfc3339(),
         "meeting": {
             "id": "test-meeting",
-            "title": "Meetily webhook test",
+            "title": "Minutes webhook test",
             "started_at": Utc::now().to_rfc3339(),
             "calendar_event_id": null,
             "external_ledger_id": null

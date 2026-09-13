@@ -14,6 +14,13 @@ import { useShell } from '@/contexts/ShellContext';
 export type NotesMode = 'enhanced' | 'raw';
 
 const DOCK_RATIO_KEY = 'meetily:workspace-dock-ratio';
+const DOCK_WIDTH_KEY = 'meetily:workspace-dock-width';
+const DEFAULT_DOCK_WIDTH = 520;
+
+function clampDockWidth(value: number, viewportWidth: number): number {
+  const max = Math.max(360, Math.round(viewportWidth * 0.7));
+  return Math.min(max, Math.max(320, value));
+}
 
 function formatDateSubtitle(createdAt: string): string {
   const date = new Date(createdAt);
@@ -65,6 +72,7 @@ export function MeetingWorkspace({
   const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
   const [ratio, setRatio] = useState(62);
+  const [dockWidth, setDockWidth] = useState(DEFAULT_DOCK_WIDTH);
   const [titleDraft, setTitleDraft] = useState(title);
   const dockRef = useRef<HTMLDivElement>(null);
 
@@ -86,6 +94,14 @@ export function MeetingWorkspace({
     if (stored) {
       const parsed = Number(stored);
       if (!Number.isNaN(parsed)) setRatio(Math.min(80, Math.max(20, parsed)));
+    }
+  }, []);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(DOCK_WIDTH_KEY);
+    if (stored) {
+      const parsed = Number(stored);
+      if (!Number.isNaN(parsed)) setDockWidth(clampDockWidth(parsed, window.innerWidth));
     }
   }, []);
 
@@ -112,6 +128,28 @@ export function MeetingWorkspace({
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
   }, [ratio]);
+
+  const onColumnDividerPointerDown = useCallback((event: React.PointerEvent) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = dockWidth;
+
+    const move = (moveEvent: PointerEvent) => {
+      const delta = moveEvent.clientX - startX;
+      setDockWidth(clampDockWidth(startWidth - delta, window.innerWidth));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      setDockWidth((current) => {
+        localStorage.setItem(DOCK_WIDTH_KEY, String(current));
+        return current;
+      });
+    };
+
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  }, [dockWidth]);
 
   const dateSubtitle = useMemo(() => formatDateSubtitle(createdAt), [createdAt]);
   const dockVisible = transcriptOpen || (chatOpen && showAssistant);
@@ -252,11 +290,25 @@ export function MeetingWorkspace({
           </div>
         </section>
 
+        {/* Drag handle between the notes column and the dock (wide layout only) */}
+        {!compact && dockVisible && (
+          <div
+            onPointerDown={onColumnDividerPointerDown}
+            className="group flex w-2 shrink-0 cursor-col-resize items-center justify-center hover:bg-surface-2"
+            title="Drag to resize"
+          >
+            <span className="h-10 w-1 rounded-full bg-hairline group-hover:bg-ink-subtle" />
+          </div>
+        )}
+
         {/* Transcript / chat dock: right rail when wide, bottom half when compact */}
         {dockVisible && (
-          <section className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-1 ${compact
-            ? 'h-1/2 w-full shrink-0 border-t border-hairline'
-            : 'w-[min(520px,42vw)] min-w-[340px] shrink-0 border-l border-hairline'}`}>
+          <section
+            className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-1 ${compact
+              ? 'h-1/2 w-full shrink-0 border-t border-hairline'
+              : 'shrink-0 border-l border-hairline'}`}
+            style={!compact ? { width: dockWidth } : undefined}
+          >
             <div ref={dockRef} className="flex min-h-0 flex-1 flex-col">
               {transcriptOpen && (
                 <div className="min-h-0 flex-1 overflow-hidden" style={chatOpen && showAssistant ? { flexBasis: `${ratio}%`, flexGrow: 0 } : undefined}>

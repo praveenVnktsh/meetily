@@ -1,4 +1,4 @@
-# Contributing to Meetily
+# Contributing to Minutes
 
 Issues and pull requests are welcome at [github.com/praveenvnktsh/minutes](https://github.com/praveenvnktsh/minutes).
 
@@ -10,8 +10,8 @@ Issues and pull requests are welcome at [github.com/praveenvnktsh/minutes](https
 4. Open a pull request describing behavior, verification, and user-visible impact.
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/meetily.git
-cd meetily
+git clone https://github.com/YOUR_USERNAME/minutes.git
+cd minutes
 git switch -c feature/short-description
 ```
 
@@ -23,9 +23,10 @@ Common checks include:
 
 ```bash
 cd frontend
-bun test
-bun x tsc --noEmit
-bun run build
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm build
 
 cd ../frontend/src-tauri
 cargo test --release --features metal

@@ -6,7 +6,7 @@ import { useSidebar } from '@/components/Sidebar/SidebarProvider';
 import Analytics from '@/lib/analytics';
 import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
-import { Loader2, MoreHorizontal } from 'lucide-react';
+import { Download, Loader2, MoreHorizontal } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { parseSummaryContent, readSummaryMetadata } from '@/lib/summary-content';
 import { TranscriptPanel } from '@/components/MeetingDetails/TranscriptPanel';
@@ -333,6 +333,18 @@ export default function PageContent({
     </Popover>
   );
 
+  const exportButton = (
+    <button
+      type="button"
+      onClick={copyOperations.handleExportMarkdown}
+      title="Export meeting as Markdown"
+      aria-label="Export meeting as Markdown"
+      className="flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-hairline px-3 text-xs text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+    >
+      <Download className="h-3.5 w-3.5" /> Export
+    </button>
+  );
+
   // Track page view
   useEffect(() => {
     Analytics.trackPageView('meeting_details');
@@ -433,7 +445,7 @@ export default function PageContent({
           showAssistant={showAssistant}
           peopleCount={peopleCount}
           statusBanner={statusBanner}
-          toolbarActions={summaryToolbarActions}
+          toolbarActions={<>{summaryToolbarActions}{exportButton}</>}
           onTitleChange={handleTitleChange}
           onRegenerate={summaryGeneration.handleRegenerateSummary}
           onStopGeneration={summaryGeneration.handleStopGeneration}
