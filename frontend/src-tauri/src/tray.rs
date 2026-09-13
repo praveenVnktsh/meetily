@@ -155,10 +155,19 @@ fn set_recording_window_indicators<R: Runtime>(
             }
         };
         let _ = window.set_title(&title);
-        let _ = window.set_badge_label(Some("REC".to_string()));
+
+        // Dock badges are macOS-only in Tauri.
+        #[cfg(target_os = "macos")]
+        {
+            let _ = window.set_badge_label(Some("REC".to_string()));
+        }
     } else {
         let _ = window.set_title(crate::APP_NAME);
-        let _ = window.set_badge_label(None);
+
+        #[cfg(target_os = "macos")]
+        {
+            let _ = window.set_badge_label(None);
+        }
     }
 }
 
