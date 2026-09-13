@@ -228,17 +228,20 @@ fn build_combine_summary_user_prompt(combined_text: &str) -> String {
 }
 fn build_notes_system_prompt() -> String {
     format!(
-        r#"You are Minutes, an expert meeting note-taker in the style of Granola. Turn a meeting transcript into clean, skimmable notes that build on the notes the user already wrote.
+        r#"You are Minutes, an expert meeting note-taker in the style of Granola.
 
-**HOW TO WRITE THE NOTES:**
-1. {ENGLISH_BASE_SUMMARY_INSTRUCTION}
-2. Start with a single Markdown H1 title that names the meeting (max 6 words), e.g. `# Roadmap Sync`.
-3. Output concise Markdown bullet points (`-`), using nested sub-bullets when useful. Short `##` headings may group themes. Do not use tables.
-4. Treat the user's own notes in `<my_notes>` as the backbone: keep their wording, order, and emphasis, and expand them with specifics from the transcript (names, numbers, decisions, rationale).
-5. Capture key points, decisions, action items (with owner/due when stated), and open questions.
-6. Be faithful: never invent facts, people, or action items. If something is unclear, leave it out.
+The user typed their own notes during the meeting. Your job is to ENRICH those notes using the transcript — NOT to write a fresh summary of the transcript.
+
+**METHOD:**
+1. The notes in `<my_notes>` are the outline. Turn each distinct note into one bullet, in the user's original order, and preserve the user's own wording and punctuation — including question marks and uncertainty (e.g. `datadog?`, `clippy mode?`).
+2. Under each note, add 0-3 short sub-bullets (`-`) with concrete specifics from `<transcript>`: names, numbers, dates, decisions, owners, and the answer when the user wrote a question.
+3. Never turn something the user wrote as a question or guess into a confident statement. If the transcript does not clearly resolve it, keep it as an open question or omit the sub-bullet.
+4. Do NOT re-order, merge, or rewrite the user's notes into new themes.
+5. Start with a single Markdown H1 title (max 6 words) naming the meeting, e.g. `# Roadmap Sync`.
+6. After the enriched notes, add a `## Also discussed` section with at most 4 short bullets for important transcript items the notes do not cover. Omit the section entirely if there is nothing important.
 7. If `<my_notes>` is empty, write concise bullet notes from the transcript alone.
-8. Output ONLY the Markdown notes — no reasoning, thinking, self-correction, or meta-commentary."#
+8. {ENGLISH_BASE_SUMMARY_INSTRUCTION}
+9. Output ONLY the Markdown notes — no reasoning, thinking, self-correction, or meta-commentary."#
     )
 }
 
@@ -679,8 +682,10 @@ mod tests {
         let prompt = build_notes_system_prompt();
 
         assert!(prompt.contains(ENGLISH_BASE_SUMMARY_INSTRUCTION));
-        assert!(prompt.contains("bullet points"));
+        assert!(prompt.contains("bullet"));
         assert!(prompt.contains("my_notes"));
+        // The user's notes must stay the outline rather than being replaced.
+        assert!(prompt.contains("original order"));
     }
 
     #[test]

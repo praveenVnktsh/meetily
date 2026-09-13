@@ -255,6 +255,44 @@ function MeetingDetailsContent() {
     return () => { cancelled = true; };
   }, [meetingId]);
 
+  // Keep the summary fresh after recording. The global auto-summary provider can
+  // start (and finish) generation after this page has already mounted, and long
+  // generations can outlive the child watcher's window — so the workspace could
+  // stay stuck on "Generating summary…" until a reload. Poll until it settles.
+  useEffect(() => {
+    if (!meetingId || meetingId === 'intro-call') return;
+
+    const status = summaryResponse?.status;
+    const settled = status === 'completed' || status === 'error' || status === 'failed' || status === 'cancelled';
+    const expecting = (isRecordingFlow && isAutoSummary) || status === 'processing' || status === 'pending';
+    if (settled || !expecting) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 600; // ~30 min at 3s
+    const refresh = async () => {
+      if (cancelled || attempts++ >= maxAttempts) return;
+      try {
+        const response = await invoke<SummaryProcessResponse>('api_get_summary', { meetingId });
+        if (cancelled) return;
+        setSummaryResponse(response);
+        if (response.status === 'completed') {
+          const summary = parseSummaryContent(response.data);
+          if (summary) setMeetingSummary(summary);
+        }
+      } catch (error) {
+        console.warn('Could not refresh summary status:', error);
+      }
+    };
+
+    void refresh();
+    const timer = setInterval(refresh, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [meetingId, isRecordingFlow, isAutoSummary, summaryResponse?.status]);
+
   // Auto-generation check: runs when meeting is loaded with no summary
   useEffect(() => {
     const checkAutoGen = async () => {
