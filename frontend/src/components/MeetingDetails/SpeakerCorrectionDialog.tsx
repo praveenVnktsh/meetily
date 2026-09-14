@@ -15,6 +15,7 @@ export interface SpeakerIdentity {
   speaker_id: string;
   display_name: string;
   segment_count: number;
+  samples?: string[];
 }
 
 interface SpeakerCorrectionDialogProps {
@@ -23,6 +24,8 @@ interface SpeakerCorrectionDialogProps {
   meetingId: string;
   speakers: SpeakerIdentity[];
   onChanged: () => Promise<void>;
+  /** Optional in-place rename handler (avoids a transcript refetch). */
+  onRenamed?: (speakerId: string, displayName: string) => Promise<void>;
 }
 
 export function SpeakerCorrectionDialog({
@@ -31,6 +34,7 @@ export function SpeakerCorrectionDialog({
   meetingId,
   speakers,
   onChanged,
+  onRenamed,
 }: SpeakerCorrectionDialogProps) {
   const [names, setNames] = useState<Record<string, string>>({});
   const [mergeTargets, setMergeTargets] = useState<Record<string, string>>({});
@@ -45,12 +49,16 @@ export function SpeakerCorrectionDialog({
     if (!displayName) return;
     setBusy(`rename:${speaker.speaker_id}`);
     try {
-      await invoke('rename_speaker', {
-        meetingId,
-        speakerId: speaker.speaker_id,
-        displayName,
-      });
-      await onChanged();
+      if (onRenamed) {
+        await onRenamed(speaker.speaker_id, displayName);
+      } else {
+        await invoke('rename_speaker', {
+          meetingId,
+          speakerId: speaker.speaker_id,
+          displayName,
+        });
+        await onChanged();
+      }
       toast.success(`Renamed ${speaker.speaker_id} to ${displayName}`);
     } catch (error) {
       toast.error(`Could not rename speaker: ${String(error)}`);
@@ -118,6 +126,15 @@ export function SpeakerCorrectionDialog({
                     </Button>
                   </div>
                 </div>
+                {speaker.samples && speaker.samples.length > 0 && (
+                  <div className="mb-2 space-y-1 border-t border-hairline pt-2">
+                    {speaker.samples.map((sample, index) => (
+                      <p key={index} className="line-clamp-2 text-xs italic text-ink-subtle">
+                        “{sample}”
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {speakers.length > 1 && (
                   <div className="flex items-center gap-2 border-t border-hairline pt-2">
                     <span className="text-xs text-ink-muted">Merge into</span>

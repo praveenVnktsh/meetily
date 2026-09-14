@@ -8,7 +8,7 @@ const COLLAPSED_KEY = 'meetily:sidebar-collapsed';
 const THEME_KEY = 'meetily:theme';
 
 /** Below this viewport width the app switches to a compact, collapsed layout. */
-export const COMPACT_BREAKPOINT = 1024;
+export const COMPACT_BREAKPOINT = 1280;
 
 interface ShellContextValue {
   collapsed: boolean;

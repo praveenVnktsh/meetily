@@ -119,19 +119,34 @@ describe('paginated transcript request ownership', () => {
     expect(state.isLoading).toBe(false);
   });
 
-  test('old loadMore cannot append data or clear the next meeting loadMore lock', async () => {
-    await load('A', true);
+  test('initial load fetches the whole transcript and further loadMore is a no-op', async () => {
+    await show('A');
+    await resolve(request('metadata', 'A'), metadata('A'));
+    // First page reports more rows, so the hook fetches the complete set.
+    await resolve(request('transcripts', 'A', 0), page('A first', true));
+    await resolve(request('transcripts', 'A', 1), page('A second'));
+
+    expect(state.hasMore).toBe(false);
+    expect(state.isLoading).toBe(false);
+    expect(state.transcripts.map(t => t.text)).toEqual(['A second']);
+
+    // Nothing left to page in, so scrolling must not trigger another IPC call.
+    const calls = requests.length;
     await act(async () => { void state.loadMore(); });
-    const stale = request('transcripts', 'A', 1);
-    await load('B', true);
-    await act(async () => { void state.loadMore(); });
-    const current = request('transcripts', 'B', 1);
-    await resolve(stale, page('old extra'));
-    expect(state.isLoadingMore).toBe(true);
+    expect(requests.length).toBe(calls);
+  });
+
+  test('a stale full load cannot replace the current meeting transcripts', async () => {
+    await show('A');
+    await resolve(request('metadata', 'A'), metadata('A'));
+    const stale = request('transcripts', 'A', 0);
+    await show('B');
+    await resolve(request('metadata', 'B'), metadata('B'));
+    await resolve(request('transcripts', 'B', 0), page('B'));
+
+    await resolve(stale, page('A'));
+    expect(state.metadata?.id).toBe('B');
     expect(state.transcripts.map(t => t.text)).toEqual(['B']);
-    await resolve(current, page('B extra'));
-    expect(state.isLoadingMore).toBe(false);
-    expect(state.transcripts.map(t => t.text)).toEqual(['B', 'B extra']);
   });
 
   test('reset invalidates pending reads and null to same meeting reloads', async () => {

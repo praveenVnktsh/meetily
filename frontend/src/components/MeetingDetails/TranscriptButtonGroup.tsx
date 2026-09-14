@@ -108,6 +108,22 @@ export function TranscriptButtonGroup({
           <span className="hidden @[22rem]:inline">Recording</span>
         </Button>
 
+        {meetingId && transcriptCount > 0 && onOpenSpeakerManager && !locked && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 rounded-full bg-[var(--surface-2)] px-3 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]"
+            onClick={() => {
+              Analytics.trackButtonClick('manage_speakers', 'meeting_details');
+              onOpenSpeakerManager();
+            }}
+            title="Manage speaker names"
+          >
+            <UserRoundCog className="@[22rem]:mr-2" size={18} />
+            <span className="hidden @[22rem]:inline">Speakers</span>
+          </Button>
+        )}
+
         {hasMoreActions && <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost" className="h-8 rounded-full bg-[var(--surface-2)] px-2.5 text-[var(--ink-muted)] hover:bg-[var(--surface-2)]" title="More transcript actions" aria-label="More transcript actions">

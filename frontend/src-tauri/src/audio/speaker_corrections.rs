@@ -12,6 +12,9 @@ pub struct SpeakerIdentity {
     pub speaker_id: String,
     pub display_name: String,
     pub segment_count: usize,
+    /// A few example lines from this speaker so the user can identify them.
+    #[serde(default)]
+    pub samples: Vec<String>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -138,22 +141,38 @@ pub async fn get_speaker_identities(
     let resolved = resolve_transcript_speakers(pool, &meeting_id, &transcripts)
         .await
         .map_err(|error| error.to_string())?;
+    const MAX_SAMPLES_PER_SPEAKER: usize = 3;
+    const MAX_SAMPLE_CHARS: usize = 180;
+
     let mut counts: HashMap<String, (String, usize)> = HashMap::new();
-    for speaker in resolved.values() {
+    let mut samples: HashMap<String, Vec<String>> = HashMap::new();
+    for transcript in &transcripts {
+        let Some(speaker) = resolved.get(&transcript.id) else {
+            continue;
+        };
         let entry = counts
             .entry(speaker.speaker_id.clone())
             .or_insert_with(|| (speaker.display_name.clone(), 0));
         entry.1 += 1;
+
+        let text = transcript.transcript.trim();
+        if text.is_empty() {
+            continue;
+        }
+        let bucket = samples.entry(speaker.speaker_id.clone()).or_default();
+        if bucket.len() < MAX_SAMPLES_PER_SPEAKER {
+            bucket.push(text.chars().take(MAX_SAMPLE_CHARS).collect());
+        }
     }
+
     let mut result: Vec<_> = counts
         .into_iter()
-        .map(
-            |(speaker_id, (display_name, segment_count))| SpeakerIdentity {
-                speaker_id,
-                display_name,
-                segment_count,
-            },
-        )
+        .map(|(speaker_id, (display_name, segment_count))| SpeakerIdentity {
+            samples: samples.remove(&speaker_id).unwrap_or_default(),
+            speaker_id,
+            display_name,
+            segment_count,
+        })
         .collect();
     result.sort_by(|left, right| left.speaker_id.cmp(&right.speaker_id));
     Ok(result)

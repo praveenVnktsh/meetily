@@ -148,6 +148,46 @@ export function usePaginatedTranscripts({
         }
     }, [meetingId, isCurrentRequest]);
 
+    // Load the entire transcript in one pass so the scrollbar reflects the full
+    // meeting instead of growing as you scroll. The query is cheap and the list
+    // is virtualized, so this is safe even for long meetings.
+    const loadAllTranscripts = useCallback(async (requestId: number): Promise<void> => {
+        if (!meetingId || !isCurrentRequest(requestId)) return;
+
+        try {
+            const first = await invoke<PaginatedTranscriptsResponse>(
+                'api_get_meeting_transcripts',
+                { meetingId, limit: DEFAULT_PAGE_SIZE, offset: 0 }
+            );
+            if (!isCurrentRequest(requestId)) return;
+
+            const total = first.total_count;
+            let all = first.transcripts;
+
+            // Fetch the remainder in a single call rather than paging on scroll.
+            if (total > all.length) {
+                const full = await invoke<PaginatedTranscriptsResponse>(
+                    'api_get_meeting_transcripts',
+                    { meetingId, limit: total, offset: 0 }
+                );
+                if (!isCurrentRequest(requestId)) return;
+                all = full.transcripts;
+            }
+
+            const sorted = [...all].sort(
+                (a, b) => (a.audio_start_time ?? 0) - (b.audio_start_time ?? 0)
+            );
+            setTranscripts(sorted);
+            setTotalCount(total);
+            setHasMore(false);
+            offsetRef.current = sorted.length;
+        } catch (err) {
+            if (!isCurrentRequest(requestId)) return;
+            console.error('Failed to load transcripts:', err);
+            setError('Failed to load transcripts');
+        }
+    }, [meetingId, isCurrentRequest]);
+
     // Load next page with debounce protection
     const loadMore = useCallback(async () => {
         const requestId = requestIdRef.current;
@@ -181,11 +221,11 @@ export function usePaginatedTranscripts({
         const requestId = requestIdRef.current;
         try {
             await loadMetadata(requestId);
-            await loadTranscriptsAtOffset(requestId, 0, false);
+            await loadAllTranscripts(requestId);
         } finally {
             if (isCurrentRequest(requestId)) setIsLoading(false);
         }
-    }, [meetingId, reset, loadMetadata, loadTranscriptsAtOffset, isCurrentRequest]);
+    }, [meetingId, reset, loadMetadata, loadAllTranscripts, isCurrentRequest]);
 
     // A new meeting or effect lifetime owns its own requests.
     useEffect(() => {

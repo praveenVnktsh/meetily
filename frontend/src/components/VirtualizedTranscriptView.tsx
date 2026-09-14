@@ -2,11 +2,14 @@
 
 import { useCallback, useRef, useReducer, startTransition, useEffect, useState, memo } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { ChevronDown } from "lucide-react";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { useTranscriptStreaming } from "@/hooks/useTranscriptStreaming";
 import { ConfidenceIndicator } from "./ConfidenceIndicator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import { RecordingStatusBar } from "./RecordingStatusBar";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { Button } from "./ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { TranscriptSegmentData } from "@/types";
 
@@ -36,6 +39,7 @@ export interface VirtualizedTranscriptViewProps {
     onLoadMore?: () => void;
     speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
     onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
+    onRenameSpeaker?: (speakerId: string, displayName: string) => void;
 }
 
 // Threshold for enabling virtualization (below this, use simple rendering)
@@ -85,6 +89,111 @@ function cleanStopWords(text: string): string {
     return cleanedText.replace(/\s+/g, ' ').trim();
 }
 
+// Click-to-edit speaker label. Renaming applies to every segment for that
+// speaker; the list lets you re-assign just this line.
+const EditableSpeakerLabel = memo(function EditableSpeakerLabel({
+    transcriptId,
+    speaker,
+    speakerId,
+    speakerOptions,
+    onSpeakerChange,
+    onRenameSpeaker,
+}: {
+    transcriptId: string;
+    speaker?: string;
+    speakerId?: string;
+    speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
+    onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
+    onRenameSpeaker?: (speakerId: string, displayName: string) => void;
+}) {
+    const label = speaker === 'mic' ? 'You' : speaker === 'system' ? 'Others' : (speaker ?? '');
+    const currentId = speakerId || speaker || '';
+    const [open, setOpen] = useState(false);
+    const [draft, setDraft] = useState(label);
+
+    useEffect(() => {
+        if (open) setDraft(label);
+    }, [open, label]);
+
+    if (!onRenameSpeaker && !onSpeakerChange) {
+        return (
+            <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${speakerChipClass(currentId)}`}>
+                {label}
+            </span>
+        );
+    }
+
+    const commitRename = () => {
+        const next = draft.trim();
+        if (!next || next === label) {
+            setOpen(false);
+            return;
+        }
+        onRenameSpeaker?.(currentId, next);
+        setOpen(false);
+    };
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    title="Edit speaker name"
+                    className={`mb-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${speakerChipClass(currentId)}`}
+                >
+                    {label}
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-64 space-y-3 p-3">
+                <div>
+                    <label className="mb-1 block text-[11px] font-medium text-ink-muted">Speaker name</label>
+                    <div className="flex items-center gap-2">
+                        <input
+                            autoFocus
+                            value={draft}
+                            onChange={(event) => setDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    commitRename();
+                                }
+                            }}
+                            className="h-8 min-w-0 flex-1 rounded-md border border-hairline bg-surface-1 px-2 text-sm text-ink outline-none focus:border-ink-subtle"
+                        />
+                        <Button size="sm" onClick={commitRename} disabled={!draft.trim() || draft.trim() === label}>
+                            Rename
+                        </Button>
+                    </div>
+                    <p className="mt-1 text-[10px] text-ink-subtle">Renames every line for this speaker.</p>
+                </div>
+                {onSpeakerChange && speakerOptions && speakerOptions.length > 0 && (
+                    <div className="border-t border-hairline pt-2">
+                        <div className="mb-1 text-[11px] font-medium text-ink-muted">Assign this line to</div>
+                        <div className="flex flex-wrap gap-1">
+                            {speakerOptions
+                                .filter((option) => option.speaker_id !== currentId)
+                                .map((option) => (
+                                    <button
+                                        key={option.speaker_id}
+                                        type="button"
+                                        onClick={() => {
+                                            onSpeakerChange(transcriptId, option.speaker_id);
+                                            setOpen(false);
+                                        }}
+                                        className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] text-ink-muted hover:text-ink"
+                                    >
+                                        {option.display_name}
+                                    </button>
+                                ))}
+                        </div>
+                    </div>
+                )}
+            </PopoverContent>
+        </Popover>
+    );
+});
+
 // Memoized transcript segment component
 const TranscriptSegment = memo(function TranscriptSegment({
     id,
@@ -95,6 +204,7 @@ const TranscriptSegment = memo(function TranscriptSegment({
     speakerId,
     speakerOptions,
     onSpeakerChange,
+    onRenameSpeaker,
     isStreaming,
     showConfidence,
 }: {
@@ -106,6 +216,7 @@ const TranscriptSegment = memo(function TranscriptSegment({
     speakerId?: string;
     speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
     onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
+    onRenameSpeaker?: (speakerId: string, displayName: string) => void;
     isStreaming: boolean;
     showConfidence: boolean;
 }) {
@@ -127,24 +238,16 @@ const TranscriptSegment = memo(function TranscriptSegment({
                     </TooltipContent>
                 </Tooltip>
                 <div className="flex-1">
-                    {speaker && (speakerOptions?.length && onSpeakerChange ? (
-                        <select
-                            aria-label={`Speaker for transcript segment ${id}`}
-                            value={speakerId || speaker}
-                            onChange={(event) => onSpeakerChange(id, event.target.value)}
-                            className="mb-1 block max-w-[220px] rounded-full border border-hairline bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-ink focus:outline-none focus:ring-1 focus:ring-ink-subtle"
-                        >
-                            {speakerOptions.map((option) => (
-                                <option key={option.speaker_id} value={option.speaker_id}>
-                                    {option.display_name}
-                                </option>
-                            ))}
-                        </select>
-                    ) : (
-                        <span className={`mb-1 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${speakerChipClass(speakerId || speaker)}`}>
-                            {speaker === 'mic' ? 'You' : speaker === 'system' ? 'Others' : speaker}
-                        </span>
-                    ))}
+                    {speaker && (
+                        <EditableSpeakerLabel
+                            transcriptId={id}
+                            speaker={speaker}
+                            speakerId={speakerId}
+                            speakerOptions={speakerOptions}
+                            onSpeakerChange={onSpeakerChange}
+                            onRenameSpeaker={onRenameSpeaker}
+                        />
+                    )}
                     {isStreaming ? (
                         <div className="bg-surface-2 border border-hairline rounded-lg px-3 py-2">
                             <p className="text-base text-ink leading-relaxed">{displayText}</p>
@@ -174,6 +277,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     onLoadMore,
     speakerOptions,
     onSpeakerChange,
+    onRenameSpeaker,
 }) => {
     // Create scroll ref first - shared between virtualizer and auto-scroll hook
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -368,6 +472,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         speakerId={segment.speakerId}
                                         speakerOptions={speakerOptions}
                                         onSpeakerChange={onSpeakerChange}
+                                        onRenameSpeaker={onRenameSpeaker}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
                                     />
@@ -428,6 +533,7 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         speakerId={segment.speakerId}
                                         speakerOptions={speakerOptions}
                                         onSpeakerChange={onSpeakerChange}
+                                        onRenameSpeaker={onRenameSpeaker}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
                                     />

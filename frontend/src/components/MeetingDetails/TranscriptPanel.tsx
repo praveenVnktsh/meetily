@@ -55,6 +55,16 @@ export function TranscriptPanel({
   const [showSpeakerDialog, setShowSpeakerDialog] = useState(false);
   const [speakerOptions, setSpeakerOptions] = useState<SpeakerIdentity[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  // Local speaker edits applied in place so renaming/reassigning does not
+  // refetch (and reset) the transcript scroll position.
+  const [speakerNames, setSpeakerNames] = useState<Record<string, string>>({});
+  const [segmentSpeakerIds, setSegmentSpeakerIds] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setSpeakerNames(
+      Object.fromEntries(speakerOptions.map((speaker) => [speaker.speaker_id, speaker.display_name])),
+    );
+  }, [speakerOptions]);
 
   const refreshSpeakers = useCallback(async () => {
     if (!meetingId) return;
@@ -71,32 +81,71 @@ export function TranscriptPanel({
 
   const handleSpeakerReassignment = useCallback(async (transcriptId: string, speakerId: string) => {
     if (!meetingId) return;
+    // Apply optimistically; no transcript refetch so scroll position is kept.
+    setSegmentSpeakerIds((current) => ({ ...current, [transcriptId]: speakerId }));
     try {
       await invoke('reassign_transcript_speaker', { meetingId, transcriptId, speakerId });
-      await onRefetchTranscripts?.();
       await refreshSpeakers();
       toast.success('Transcript segment reassigned');
     } catch (error) {
+      setSegmentSpeakerIds((current) => {
+        const next = { ...current };
+        delete next[transcriptId];
+        return next;
+      });
       toast.error(`Could not reassign speaker: ${String(error)}`);
     }
-  }, [meetingId, onRefetchTranscripts, refreshSpeakers]);
+  }, [meetingId, refreshSpeakers]);
 
-  // Convert transcripts to segments if pagination is not used but we want virtualization
-  const convertedSegments = useMemo(() => {
-    if (usePagination && segments) {
-      return segments;
+  const handleRenameSpeaker = useCallback(async (speakerId: string, displayName: string) => {
+    if (!meetingId) return;
+    // Apply optimistically to every segment with this speaker id.
+    const previous = speakerNames[speakerId];
+    setSpeakerNames((current) => ({ ...current, [speakerId]: displayName }));
+    try {
+      await invoke('rename_speaker', { meetingId, speakerId, displayName });
+      await refreshSpeakers();
+      toast.success(`Renamed to ${displayName}`);
+    } catch (error) {
+      setSpeakerNames((current) => {
+        const next = { ...current };
+        if (previous === undefined) delete next[speakerId];
+        else next[speakerId] = previous;
+        return next;
+      });
+      toast.error(`Could not rename speaker: ${String(error)}`);
     }
-    // Convert transcripts to segments for virtualization
-    return transcripts.map(t => ({
-      id: t.id,
-      timestamp: t.audio_start_time ?? 0,
-      endTime: t.audio_end_time,
-      text: t.text,
-      confidence: t.confidence,
-      speaker: t.speaker,
-      speakerId: t.speaker_id,
-    }));
-  }, [transcripts, usePagination, segments]);
+  }, [meetingId, refreshSpeakers, speakerNames]);
+
+  // Merging remaps speaker identities, so reload transcripts from the database.
+  const handleSpeakersChanged = useCallback(async () => {
+    await onRefetchTranscripts?.();
+    await refreshSpeakers();
+  }, [onRefetchTranscripts, refreshSpeakers]);
+
+  // Convert transcripts to segments, then apply any in-place speaker edits.
+  const convertedSegments = useMemo(() => {
+    const base = (usePagination && segments)
+      ? segments
+      : transcripts.map(t => ({
+          id: t.id,
+          timestamp: t.audio_start_time ?? 0,
+          endTime: t.audio_end_time,
+          text: t.text,
+          confidence: t.confidence,
+          speaker: t.speaker,
+          speakerId: t.speaker_id,
+        }));
+
+    return base.map((segment) => {
+      const speakerId = segmentSpeakerIds[segment.id] ?? segment.speakerId ?? segment.speaker;
+      const displayName = (speakerId ? speakerNames[speakerId] : undefined)
+        ?? segment.speaker
+        ?? speakerId;
+      if (speakerId === segment.speakerId && displayName === segment.speaker) return segment;
+      return { ...segment, speakerId, speaker: displayName };
+    });
+  }, [transcripts, usePagination, segments, speakerNames, segmentSpeakerIds]);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const displaySegments = useMemo(() => {
@@ -173,6 +222,7 @@ export function TranscriptPanel({
             onLoadMore={onLoadMore}
             speakerOptions={speakerOptions}
             onSpeakerChange={meetingId && !locked ? handleSpeakerReassignment : undefined}
+            onRenameSpeaker={meetingId && !locked ? handleRenameSpeaker : undefined}
           />
         </div>
       )}
@@ -183,10 +233,8 @@ export function TranscriptPanel({
           onOpenChange={setShowSpeakerDialog}
           meetingId={meetingId}
           speakers={speakerOptions}
-          onChanged={async () => {
-            await onRefetchTranscripts?.();
-            await refreshSpeakers();
-          }}
+          onChanged={handleSpeakersChanged}
+          onRenamed={handleRenameSpeaker}
         />
       )}
     </div>

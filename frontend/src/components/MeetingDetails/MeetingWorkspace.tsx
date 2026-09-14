@@ -9,7 +9,7 @@ import {
   RotateCw,
   Sparkles,
 } from 'lucide-react';
-import { useShell } from '@/contexts/ShellContext';
+import { useShell, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/contexts/ShellContext';
 
 export type NotesMode = 'enhanced' | 'raw';
 
@@ -17,8 +17,12 @@ const DOCK_RATIO_KEY = 'meetily:workspace-dock-ratio';
 const DOCK_WIDTH_KEY = 'meetily:workspace-dock-width';
 const DEFAULT_DOCK_WIDTH = 520;
 
-function clampDockWidth(value: number, viewportWidth: number): number {
-  const max = Math.max(360, Math.round(viewportWidth * 0.7));
+/** Keep the notes column readable: never let the dock take so much that the
+ *  notes fall below MIN_NOTES_WIDTH. */
+const MIN_NOTES_WIDTH = 520;
+
+function clampDockWidth(value: number, viewportWidth: number, sidebarWidth: number): number {
+  const max = Math.max(360, viewportWidth - sidebarWidth - MIN_NOTES_WIDTH);
   return Math.min(max, Math.max(320, value));
 }
 
@@ -68,7 +72,8 @@ export function MeetingWorkspace({
   onStopGeneration?: () => void;
   isGenerating?: boolean;
 }) {
-  const { compact } = useShell();
+  const { compact, collapsed } = useShell();
+  const sidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
   const [transcriptOpen, setTranscriptOpen] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
   const [ratio, setRatio] = useState(62);
@@ -97,13 +102,24 @@ export function MeetingWorkspace({
     }
   }, []);
 
+  // Load the persisted dock width once.
   useEffect(() => {
     const stored = localStorage.getItem(DOCK_WIDTH_KEY);
     if (stored) {
       const parsed = Number(stored);
-      if (!Number.isNaN(parsed)) setDockWidth(clampDockWidth(parsed, window.innerWidth));
+      if (!Number.isNaN(parsed)) setDockWidth(parsed);
     }
   }, []);
+
+  // Keep the dock within bounds as the sidebar/compact state or window changes,
+  // so the notes never get squeezed.
+  useEffect(() => {
+    const reclamp = () =>
+      setDockWidth((current) => clampDockWidth(current, window.innerWidth, sidebarWidth));
+    reclamp();
+    window.addEventListener('resize', reclamp);
+    return () => window.removeEventListener('resize', reclamp);
+  }, [sidebarWidth]);
 
   const onDividerPointerDown = useCallback((event: React.PointerEvent) => {
     event.preventDefault();
@@ -136,7 +152,7 @@ export function MeetingWorkspace({
 
     const move = (moveEvent: PointerEvent) => {
       const delta = moveEvent.clientX - startX;
-      setDockWidth(clampDockWidth(startWidth - delta, window.innerWidth));
+      setDockWidth(clampDockWidth(startWidth - delta, window.innerWidth, sidebarWidth));
     };
     const up = () => {
       window.removeEventListener('pointermove', move);
@@ -149,7 +165,7 @@ export function MeetingWorkspace({
 
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
-  }, [dockWidth]);
+  }, [dockWidth, sidebarWidth]);
 
   const dateSubtitle = useMemo(() => formatDateSubtitle(createdAt), [createdAt]);
   const dockVisible = transcriptOpen || (chatOpen && showAssistant);
@@ -238,11 +254,11 @@ export function MeetingWorkspace({
         </div>
       </div>
 
-      <div className={`flex min-h-0 flex-1 overflow-hidden ${compact ? 'flex-col' : 'flex-row'}`}>
+      <div className="flex min-h-0 flex-1 flex-row overflow-hidden">
         {/* Center: notes document */}
         <section className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
           {/* Toolbar */}
-          <div className="flex shrink-0 items-center gap-1.5 overflow-hidden px-8 pb-3">
+          <div className="flex shrink-0 flex-wrap items-center gap-1.5 px-8 pb-3">
             {/* Enhanced / Raw segmented toggle */}
             <div className="flex h-8 shrink-0 items-center rounded-full bg-surface-2 p-0.5">
               <button
@@ -290,8 +306,8 @@ export function MeetingWorkspace({
           </div>
         </section>
 
-        {/* Drag handle between the notes column and the dock (wide layout only) */}
-        {!compact && dockVisible && (
+        {/* Drag handle between the notes column and the side dock */}
+        {dockVisible && (
           <div
             onPointerDown={onColumnDividerPointerDown}
             className="group flex w-2 shrink-0 cursor-col-resize items-center justify-center hover:bg-surface-2"
@@ -301,13 +317,11 @@ export function MeetingWorkspace({
           </div>
         )}
 
-        {/* Transcript / chat dock: right rail when wide, bottom half when compact */}
+        {/* Transcript / chat dock: always a right-side rail; collapsed by default in compact */}
         {dockVisible && (
           <section
-            className={`flex min-h-0 min-w-0 flex-col overflow-hidden bg-surface-1 ${compact
-              ? 'h-1/2 w-full shrink-0 border-t border-hairline'
-              : 'shrink-0 border-l border-hairline'}`}
-            style={!compact ? { width: dockWidth } : undefined}
+            className="flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden border-l border-hairline bg-surface-1"
+            style={{ width: dockWidth }}
           >
             <div ref={dockRef} className="flex min-h-0 flex-1 flex-col">
               {transcriptOpen && (
