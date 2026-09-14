@@ -431,6 +431,31 @@ pub async fn save_text_export<R: Runtime>(
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Resolve the playable audio file for a meeting (inside its recording folder).
+#[tauri::command]
+pub async fn api_get_meeting_audio_path<R: Runtime>(
+    _app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+) -> Result<Option<String>, String> {
+    let folder: Option<String> =
+        sqlx::query_scalar::<_, Option<String>>("SELECT folder_path FROM meetings WHERE id = ?")
+            .bind(&meeting_id)
+            .fetch_optional(state.db_manager.pool())
+            .await
+            .map_err(|e| e.to_string())?
+            .flatten();
+
+    let Some(folder) = folder else {
+        return Ok(None);
+    };
+
+    match crate::audio::retranscription::find_audio_file(std::path::Path::new(&folder)) {
+        Ok(path) => Ok(Some(path.to_string_lossy().to_string())),
+        Err(_) => Ok(None),
+    }
+}
+
 /// Read the current custom transcription vocabulary.
 #[tauri::command]
 pub async fn api_get_transcription_vocabulary<R: Runtime>(

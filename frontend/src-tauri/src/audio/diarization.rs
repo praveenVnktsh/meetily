@@ -286,12 +286,58 @@ fn speaker_for_transcript(transcript: &Transcript, turns: &[SpeakerTurn]) -> Opt
     })
 }
 
+/// Resolve the final speaker label for a transcript, promoting the user's own
+/// cluster to `mic` (which the UI renders as "You") when we are confident.
+fn resolved_speaker(
+    transcript: &Transcript,
+    turns: &[SpeakerTurn],
+    user_label: Option<&str>,
+) -> Option<String> {
+    let assigned = speaker_for_transcript(transcript, turns).or_else(|| transcript.speaker.clone());
+    match (assigned.as_deref(), user_label) {
+        (Some(label), Some(user)) if label == user => Some("mic".to_string()),
+        _ => assigned,
+    }
+}
+
+/// Identify the user's cluster from the microphone channel.
+///
+/// Before diarization the `speaker` column still holds `mic`/`system` (the
+/// capture channel). If every microphone segment maps to exactly one cluster and
+/// that cluster does not also appear on the system channel, it is unambiguously
+/// the user. Multiple people in one room (several mic clusters) stay unlabeled.
+fn detect_user_speaker_label(transcripts: &[Transcript], turns: &[SpeakerTurn]) -> Option<String> {
+    let mut mic_labels = HashSet::new();
+    let mut system_labels = HashSet::new();
+    for transcript in transcripts {
+        let Some(label) = speaker_for_transcript(transcript, turns) else {
+            continue;
+        };
+        match transcript.speaker.as_deref() {
+            Some("mic") => {
+                mic_labels.insert(label);
+            }
+            Some("system") => {
+                system_labels.insert(label);
+            }
+            _ => {}
+        }
+    }
+
+    if mic_labels.len() != 1 {
+        return None;
+    }
+    let label = mic_labels.into_iter().next()?;
+    (!system_labels.contains(&label)).then_some(label)
+}
+
 async fn persist<R: Runtime>(
     app: &AppHandle<R>,
     meeting_id: &str,
     folder: &Path,
     transcripts: &[Transcript],
     result: &DiarizationResult,
+    user_label: Option<&str>,
 ) -> Result<()> {
     let state = app
         .try_state::<AppState>()
@@ -299,14 +345,26 @@ async fn persist<R: Runtime>(
     let pool = state.db_manager.pool();
     let mut tx = pool.begin().await?;
     for transcript in transcripts {
-        let speaker = speaker_for_transcript(transcript, &result.turns)
-            .or_else(|| transcript.speaker.clone());
+        let speaker = resolved_speaker(transcript, &result.turns, user_label);
         sqlx::query("UPDATE transcripts SET speaker = ? WHERE id = ? AND meeting_id = ?")
             .bind(speaker)
             .bind(&transcript.id)
             .bind(meeting_id)
             .execute(&mut *tx)
             .await?;
+    }
+
+    // Seed a friendly name for the user's channel without clobbering a rename.
+    if user_label.is_some() {
+        sqlx::query(
+            "INSERT INTO speaker_identities (meeting_id, speaker_id, display_name, merged_into, updated_at) \
+             VALUES (?, 'mic', 'You', NULL, ?) \
+             ON CONFLICT(meeting_id, speaker_id) DO NOTHING",
+        )
+        .bind(meeting_id)
+        .bind(Utc::now().to_rfc3339())
+        .execute(&mut *tx)
+        .await?;
     }
     sqlx::query("INSERT INTO diarization_runs (id, meeting_id, engine, segmentation_model, embedding_model, result_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
         .bind(&result.id)
@@ -326,8 +384,7 @@ async fn persist<R: Runtime>(
             id: transcript.id.clone(),
             text: transcript.transcript.clone(),
             timestamp: transcript.timestamp.clone(),
-            speaker: speaker_for_transcript(transcript, &result.turns)
-                .or_else(|| transcript.speaker.clone()),
+            speaker: resolved_speaker(transcript, &result.turns, user_label),
             audio_start_time: transcript.audio_start_time,
             audio_end_time: transcript.audio_end_time,
             duration: transcript.duration,
@@ -391,6 +448,13 @@ pub async fn run_for_meeting<R: Runtime>(
         return Err(anyhow!("No speaker turns were detected"));
     }
     stabilize_turn_labels(&mut turns, &transcripts);
+    let user_label = detect_user_speaker_label(&transcripts, &turns);
+    if let Some(label) = &user_label {
+        log::info!(
+            "Diarization: mic channel maps to a single cluster ({}); labeling it as the user",
+            label
+        );
+    }
     let speaker_count = turns
         .iter()
         .map(|turn| &turn.speaker)
@@ -406,7 +470,7 @@ pub async fn run_for_meeting<R: Runtime>(
         speaker_count,
         turns,
     };
-    persist(app, meeting_id, &folder, &transcripts, &result)
+    persist(app, meeting_id, &folder, &transcripts, &result, user_label.as_deref())
         .await
         .context("Failed to persist diarization output")?;
     let _ = app.emit("diarization-complete", &result);
@@ -489,6 +553,68 @@ mod tests {
         stabilize_turn_labels(&mut turns, &transcripts);
         assert_eq!(turns[0].speaker, "speaker_03");
         assert_eq!(turns[1].speaker, "speaker_01");
+    }
+
+    #[test]
+    fn detects_user_when_mic_is_a_single_cluster() {
+        let transcripts = vec![
+            transcript("a", 0.0, 2.0, Some("mic")),
+            transcript("b", 3.0, 5.0, Some("mic")),
+            transcript("c", 6.0, 8.0, Some("system")),
+        ];
+        let turns = vec![
+            SpeakerTurn { start: 0.0, end: 2.5, speaker: "speaker_00".into(), confidence: 1.0 },
+            SpeakerTurn { start: 3.0, end: 5.0, speaker: "speaker_00".into(), confidence: 1.0 },
+            SpeakerTurn { start: 6.0, end: 8.0, speaker: "speaker_01".into(), confidence: 1.0 },
+        ];
+        assert_eq!(
+            detect_user_speaker_label(&transcripts, &turns),
+            Some("speaker_00".to_string())
+        );
+    }
+
+    #[test]
+    fn skips_user_when_mic_has_multiple_speakers() {
+        let transcripts = vec![
+            transcript("a", 0.0, 2.0, Some("mic")),
+            transcript("b", 3.0, 5.0, Some("mic")),
+        ];
+        let turns = vec![
+            SpeakerTurn { start: 0.0, end: 2.5, speaker: "speaker_00".into(), confidence: 1.0 },
+            SpeakerTurn { start: 3.0, end: 5.0, speaker: "speaker_01".into(), confidence: 1.0 },
+        ];
+        assert_eq!(detect_user_speaker_label(&transcripts, &turns), None);
+    }
+
+    #[test]
+    fn skips_user_when_mic_cluster_also_appears_on_system() {
+        let transcripts = vec![
+            transcript("a", 0.0, 2.0, Some("mic")),
+            transcript("c", 1.0, 2.0, Some("system")),
+        ];
+        let turns = vec![SpeakerTurn {
+            start: 0.0,
+            end: 2.5,
+            speaker: "speaker_00".into(),
+            confidence: 1.0,
+        }];
+        assert_eq!(detect_user_speaker_label(&transcripts, &turns), None);
+    }
+
+    #[test]
+    fn resolved_speaker_promotes_user_cluster_to_mic() {
+        let turns = vec![
+            SpeakerTurn { start: 0.0, end: 2.0, speaker: "speaker_00".into(), confidence: 1.0 },
+            SpeakerTurn { start: 2.0, end: 4.0, speaker: "speaker_01".into(), confidence: 1.0 },
+        ];
+        assert_eq!(
+            resolved_speaker(&transcript("a", 0.0, 1.5, Some("mic")), &turns, Some("speaker_00")),
+            Some("mic".to_string())
+        );
+        assert_eq!(
+            resolved_speaker(&transcript("b", 2.0, 3.5, Some("system")), &turns, Some("speaker_00")),
+            Some("speaker_01".to_string())
+        );
     }
 
     #[cfg(target_os = "macos")]

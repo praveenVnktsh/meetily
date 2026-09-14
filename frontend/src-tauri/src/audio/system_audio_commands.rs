@@ -54,9 +54,24 @@ pub async fn start_system_audio_monitoring(
         match event {
             SystemAudioEvent::SystemAudioStarted(apps) => {
                 tracing::info!("System audio started by apps: {:?}", apps);
+
+                // Drive the tray and the floating prompt straight from Rust so
+                // they work even if the webview is hidden/throttled.
+                let detected = crate::meeting_detection::detect_meeting_app(&apps);
+                crate::tray::set_meeting_detected(&app_handle, detected.clone());
+
+                if let Some(name) = detected {
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::meeting_prompt::maybe_show(&app, &name).await;
+                    });
+                }
+
                 let _ = app_handle.emit("system-audio-started", apps);
             }
             SystemAudioEvent::SystemAudioStopped => {
+                crate::tray::set_meeting_detected(&app_handle, None);
+                crate::meeting_prompt::reset();
                 let _ = app_handle.emit("system-audio-stopped", ());
                 tracing::info!("System audio stopped");
             }

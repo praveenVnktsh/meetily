@@ -1,6 +1,8 @@
 export interface DetectedMeetingApp {
   name: string;
   detectedProcess: string;
+  /** True when the app was not in the known list (generic fallback). */
+  generic?: boolean;
 }
 
 const MEETING_APP_PATTERNS: Array<{ name: string; patterns: RegExp[] }> = [
@@ -14,9 +16,46 @@ const MEETING_APP_PATTERNS: Array<{ name: string; patterns: RegExp[] }> = [
   { name: 'Amazon Chime', patterns: [/\bamazon chime\b/i] },
   { name: 'GoTo Meeting', patterns: [/\bgotomeeting\b/i, /\bgo to meeting\b/i] },
   { name: 'BlueJeans', patterns: [/\bbluejeans\b/i] },
+  { name: 'WhatsApp', patterns: [/\bwhatsapp\b/i] },
+  { name: 'Telegram', patterns: [/^telegram$/i] },
+  { name: 'Signal', patterns: [/^signal$/i] },
 ];
 
-export function detectMeetingApp(processNames: string[]): DetectedMeetingApp | null {
+/**
+ * Apps that play audio but are not meetings. The generic fallback ignores
+ * these so music/video playback (and browser audio, which is probed for Meet
+ * separately) does not trigger a false prompt.
+ */
+const NON_MEETING_AUDIO_PATTERNS: RegExp[] = [
+  /spotify/i,
+  /^music$/i,
+  /podcasts?/i,
+  /^vlc$/i,
+  /quicktime/i,
+  /imovie/i,
+  /garageband/i,
+  /audacity/i,
+  /^safari$/i,
+  /^google chrome$/i,
+  /^chrome$/i,
+  /^microsoft edge$/i,
+  /^edge$/i,
+  /firefox/i,
+  /brave/i,
+  /\barc$/i,
+  /chromium/i,
+  /opera/i,
+  /^minutes$/i,
+  /^meetily$/i,
+  /coreaudio/i,
+];
+
+export function detectMeetingApp(
+  processNames: string[],
+  options: { allowUnknown?: boolean } = {},
+): DetectedMeetingApp | null {
+  let generic: DetectedMeetingApp | null = null;
+
   for (const processName of processNames) {
     const trimmedName = processName.trim();
     if (!trimmedName) continue;
@@ -27,7 +66,15 @@ export function detectMeetingApp(processNames: string[]): DetectedMeetingApp | n
     if (match) {
       return { name: match.name, detectedProcess: trimmedName };
     }
+
+    if (
+      !generic
+      && options.allowUnknown
+      && !NON_MEETING_AUDIO_PATTERNS.some((pattern) => pattern.test(trimmedName))
+    ) {
+      generic = { name: trimmedName, detectedProcess: trimmedName, generic: true };
+    }
   }
 
-  return null;
+  return generic;
 }

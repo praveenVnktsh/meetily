@@ -106,6 +106,12 @@ static TRANSCRIPTION_TASK: Mutex<Option<JoinHandle<()>>> = Mutex::new(None);
 // Listener ID for proper cleanup - prevents microphone from staying active after recording stops
 static TRANSCRIPT_LISTENER_ID: Mutex<Option<tauri::EventId>> = Mutex::new(None);
 
+// Kept when live transcription starts deferred so the worker can be started if
+// the user enables live transcription mid-recording.
+static PENDING_TRANSCRIPTION_RECEIVER: Mutex<
+    Option<tokio::sync::mpsc::UnboundedReceiver<crate::audio::recording_state::AudioChunk>>,
+> = Mutex::new(None);
+
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE: &str =
     "TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED";
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE: &str = "Speech recognition could not initialize. Restart Minutes. If the problem continues, repair or reinstall the app.";
@@ -471,7 +477,8 @@ pub async fn start_recording_with_meeting_name<R: Runtime>(
         *global_listener = Some(listener_id);
         info!("✅ Transcript-update event listener registered for history persistence");
     } else {
-        drop(transcription_receiver);
+        // Hold onto the receiver so live transcription can be enabled mid-meeting.
+        *PENDING_TRANSCRIPTION_RECEIVER.lock().unwrap() = Some(transcription_receiver);
         *TRANSCRIPTION_TASK.lock().unwrap() = None;
         *TRANSCRIPT_LISTENER_ID.lock().unwrap() = None;
         info!("⏺️ Deferred transcription mode active; recording audio without loading a live transcription engine");
@@ -663,7 +670,8 @@ pub async fn start_recording_with_devices_and_meeting<R: Runtime>(
         *global_listener = Some(listener_id);
         info!("✅ Transcript-update event listener registered for history persistence");
     } else {
-        drop(transcription_receiver);
+        // Hold onto the receiver so live transcription can be enabled mid-meeting.
+        *PENDING_TRANSCRIPTION_RECEIVER.lock().unwrap() = Some(transcription_receiver);
         *TRANSCRIPTION_TASK.lock().unwrap() = None;
         *TRANSCRIPT_LISTENER_ID.lock().unwrap() = None;
         info!("⏺️ Deferred transcription mode active; recording audio without loading a live transcription engine");
@@ -774,6 +782,7 @@ pub async fn stop_recording<R: Runtime>(
         let mut global_task = TRANSCRIPTION_TASK.lock().unwrap();
         global_task.take()
     };
+    *PENDING_TRANSCRIPTION_RECEIVER.lock().unwrap() = None;
 
     if let Some(task_handle) = transcription_task {
         info!("⏳ Waiting for ALL transcription chunks to be processed (no timeout - preserving every chunk)");
@@ -1125,6 +1134,78 @@ pub fn current_active_duration_seconds() -> Option<f64> {
     manager_guard
         .as_ref()
         .and_then(|manager| manager.get_active_recording_duration())
+}
+
+/// Start the live transcription worker during an active recording.
+///
+/// Used when the user enables live transcription mid-meeting after starting in
+/// deferred mode. The transcription receiver was retained at start for this.
+pub async fn ensure_live_transcription_running<R: Runtime>(app: &AppHandle<R>) {
+    if !IS_RECORDING.load(Ordering::SeqCst) {
+        return;
+    }
+
+    {
+        let task = TRANSCRIPTION_TASK.lock().unwrap();
+        if task
+            .as_ref()
+            .map(|handle| !handle.is_finished())
+            .unwrap_or(false)
+        {
+            return; // Already running.
+        }
+    }
+
+    let receiver = PENDING_TRANSCRIPTION_RECEIVER
+        .lock()
+        .ok()
+        .and_then(|mut pending| pending.take());
+    let Some(receiver) = receiver else {
+        return;
+    };
+
+    if let Err(error) = transcription::validate_transcription_model_ready(app).await {
+        let _ = app.emit(
+            "transcription-error",
+            serde_json::json!({
+                "error": error,
+                "userMessage": "Live transcription could not start. Check your model settings.",
+                "actionable": true,
+                "phase": "active"
+            }),
+        );
+        // Return the receiver so a later attempt can retry.
+        *PENDING_TRANSCRIPTION_RECEIVER.lock().unwrap() = Some(receiver);
+        return;
+    }
+
+    // Persist live history across reloads (the listener was cleared in deferred mode).
+    use tauri::Listener;
+    let listener_id = app.listen("transcript-update", move |event: tauri::Event| {
+        if let Ok(update) = serde_json::from_str::<TranscriptUpdate>(event.payload()) {
+            let segment = crate::audio::recording_saver::TranscriptSegment {
+                id: format!("seg_{}", update.sequence_id),
+                text: update.text.clone(),
+                audio_start_time: update.audio_start_time,
+                audio_end_time: update.audio_end_time,
+                duration: update.duration,
+                display_time: update.timestamp.clone(),
+                confidence: update.confidence,
+                sequence_id: update.sequence_id,
+                speaker: Some(update.source.clone()),
+            };
+            if let Ok(manager_guard) = RECORDING_MANAGER.lock() {
+                if let Some(manager) = manager_guard.as_ref() {
+                    manager.add_transcript_segment(segment);
+                }
+            }
+        }
+    });
+    *TRANSCRIPT_LISTENER_ID.lock().unwrap() = Some(listener_id);
+
+    let handle = transcription::start_transcription_task(app.clone(), receiver);
+    *TRANSCRIPTION_TASK.lock().unwrap() = Some(handle);
+    info!("▶️ Live transcription enabled mid-recording");
 }
 
 /// Get recording statistics

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex as StdMutex;
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_store::StoreExt;
 // Removed unused import
 
@@ -49,6 +50,8 @@ pub mod anthropic;
 pub mod groq;
 pub mod live_notes;
 pub mod meeting_assistant;
+pub mod meeting_detection;
+pub mod meeting_prompt;
 pub mod openrouter;
 pub mod parakeet_engine;
 pub mod shortcuts;
@@ -434,9 +437,16 @@ async fn start_recording_with_devices_and_meeting<R: Runtime>(
 }
 
 #[tauri::command]
-fn set_live_transcription_enabled(enabled: bool) -> Result<(), String> {
+async fn set_live_transcription_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    enabled: bool,
+) -> Result<(), String> {
     log_info!("Setting live transcription enabled: {}", enabled);
     audio::pipeline::LIVE_TRANSCRIPTION_ENABLED.store(enabled, std::sync::atomic::Ordering::SeqCst);
+    if enabled {
+        // If a recording is already running in deferred mode, start the worker now.
+        audio::recording_commands::ensure_live_transcription_running(&app).await;
+    }
     Ok(())
 }
 
@@ -453,6 +463,19 @@ async fn set_language_preference(language: String) -> Result<(), String> {
 // Internal helper function to get language preference (for use within Rust code)
 pub fn get_language_preference_internal() -> Option<String> {
     LANGUAGE_PREFERENCE.lock().ok().map(|lang| lang.clone())
+}
+
+/// Parse `minutes://meeting/<id>` (also tolerates `minutes:///meeting/<id>`).
+fn meeting_id_from_deep_link(raw: &str) -> Option<String> {
+    let rest = raw.strip_prefix("minutes://")?;
+    let rest = rest.trim_start_matches('/');
+    let rest = rest.strip_prefix("meeting/")?;
+    let id = rest
+        .split(['?', '#'])
+        .next()
+        .unwrap_or("")
+        .trim_end_matches('/');
+    (!id.is_empty()).then(|| id.to_string())
 }
 
 pub fn run() {
@@ -480,6 +503,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(whisper_engine::parallel_commands::ParallelProcessorState::new())
         .manage(Arc::new(RwLock::new(
             None::<notifications::manager::NotificationManager<tauri::Wry>>,
@@ -525,6 +549,32 @@ pub fn run() {
 
             // Register app-wide shortcuts (toggle recording / window)
             shortcuts::register(_app.handle());
+
+            // Deep links: minutes://meeting/<id> opens that meeting.
+            {
+                let handle = _app.handle().clone();
+                let listener_handle = handle.clone();
+                handle.deep_link().on_open_url(move |event| {
+                    for url in event.urls() {
+                        if let Some(meeting_id) = meeting_id_from_deep_link(url.as_str()) {
+                            tray::open_meeting(&listener_handle, &meeting_id);
+                        }
+                    }
+                });
+
+                // Cold start: the URL may arrive before the listener is attached.
+                tauri::async_runtime::spawn(async move {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(800)).await;
+                    if let Ok(Some(urls)) = handle.deep_link().get_current() {
+                        for url in urls {
+                            if let Some(meeting_id) = meeting_id_from_deep_link(url.as_str()) {
+                                tray::open_meeting(&handle, &meeting_id);
+                                break;
+                            }
+                        }
+                    }
+                });
+            }
 
             // Load the custom transcription vocabulary into the Whisper engine.
             if let Ok(store) = _app.store("store.json") {
@@ -642,6 +692,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            tray::set_meeting_detected_tray,
+            meeting_prompt::dismiss_meeting_prompt,
+            meeting_prompt::start_recording_from_prompt,
             start_recording,
             stop_recording,
             is_recording,
@@ -755,6 +808,7 @@ pub fn run() {
             api::api_set_meeting_pinned,
             api::api_set_meeting_archived,
             api::save_text_export,
+            api::api_get_meeting_audio_path,
             api::api_get_transcription_vocabulary,
             api::api_set_transcription_vocabulary,
             api::api_search_transcripts,

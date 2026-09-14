@@ -84,6 +84,9 @@ export default function PageContent({
     arrivedRecording || arrivedTranscribing ? 'transcribing' : expectSummary ? 'summarizing' : 'ready'
   );
   const [summaryWatchExhausted, setSummaryWatchExhausted] = useState(false);
+  // True when raw notes changed after the last enhancement, so the workspace can
+  // nudge the user to re-enhance instead of regenerating automatically.
+  const [notesDirtySinceSummary, setNotesDirtySinceSummary] = useState(false);
   const recordingState = useRecordingState();
   const isRecordingThisMeeting = arrivedRecording && recordingState.isRecording;
 
@@ -272,6 +275,24 @@ export default function PageContent({
     }
   }, [meetingData.aiSummary, summaryGeneration.summaryStatus, summaryWatchExhausted]);
 
+  // Glow the re-enhance control when the user's notes changed after the last
+  // enhancement. Enhancement itself stays manual.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const id = (event as CustomEvent<{ meetingId?: string }>).detail?.meetingId;
+      if (id && id !== meeting.id) return;
+      setNotesDirtySinceSummary(true);
+    };
+    window.addEventListener('meetily:raw-notes-changed', handler);
+    return () => window.removeEventListener('meetily:raw-notes-changed', handler);
+  }, [meeting.id]);
+
+  useEffect(() => {
+    if (summaryGeneration.summaryStatus === 'completed') {
+      setNotesDirtySinceSummary(false);
+    }
+  }, [summaryGeneration.summaryStatus]);
+
   const isSummaryActive = summaryGeneration.summaryStatus === 'processing'
     || summaryGeneration.summaryStatus === 'summarizing'
     || summaryGeneration.summaryStatus === 'regenerating';
@@ -447,9 +468,13 @@ export default function PageContent({
           statusBanner={statusBanner}
           toolbarActions={<>{summaryToolbarActions}{exportButton}</>}
           onTitleChange={handleTitleChange}
-          onRegenerate={summaryGeneration.handleRegenerateSummary}
+          onRegenerate={() => {
+            setNotesDirtySinceSummary(false);
+            void summaryGeneration.handleRegenerateSummary();
+          }}
           onStopGeneration={summaryGeneration.handleStopGeneration}
           isGenerating={isSummaryActive}
+          notesDirty={notesDirtySinceSummary}
           transcript={
             <TranscriptPanel
               transcripts={meetingData.transcripts}

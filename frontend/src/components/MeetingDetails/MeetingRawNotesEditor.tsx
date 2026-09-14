@@ -65,6 +65,8 @@ export function MeetingRawNotesEditor({ meetingId }: { meetingId: string }) {
     pendingDocumentRef.current = next;
     hasPendingSaveRef.current = true;
     setSaveState('saving');
+    // Let the workspace glow the re-enhance control; enhancement stays manual.
+    window.dispatchEvent(new CustomEvent('meetily:raw-notes-changed', { detail: { meetingId } }));
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       void invoke('save_meeting_live_notes', { meetingId, document: next })

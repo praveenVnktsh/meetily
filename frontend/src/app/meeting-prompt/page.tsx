@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { emit, listen } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Mic, Video, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -26,12 +27,12 @@ export default function MeetingPromptPage() {
   }, []);
 
   const dismiss = async () => {
-    await emit('meeting-prompt-dismissed');
+    await invoke('dismiss_meeting_prompt').catch(() => {});
     await getCurrentWindow().hide();
   };
 
   const startRecording = async () => {
-    await emit('meeting-prompt-start-recording');
+    await invoke('start_recording_from_prompt').catch(() => {});
     await getCurrentWindow().hide();
   };
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useReducer, startTransition, useEffect, useState, memo } from "react";
+import { useCallback, useRef, useReducer, startTransition, useEffect, useState, memo, type ReactNode } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ChevronDown } from "lucide-react";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
@@ -40,6 +40,16 @@ export interface VirtualizedTranscriptViewProps {
     speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
     onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
     onRenameSpeaker?: (speakerId: string, displayName: string) => void;
+    /** Play the recording from a segment's timestamp. */
+    onSeek?: (seconds: number) => void;
+    /** Segment currently playing, highlighted in the list. */
+    activeSegmentId?: string;
+    /** Ids of segments matching the transcript search. */
+    matchIds?: Set<string>;
+    /** The search match currently in focus. */
+    activeMatchId?: string;
+    /** Query to highlight inside segment text. */
+    highlightQuery?: string;
 }
 
 // Threshold for enabling virtualization (below this, use simple rendering)
@@ -205,6 +215,11 @@ const TranscriptSegment = memo(function TranscriptSegment({
     speakerOptions,
     onSpeakerChange,
     onRenameSpeaker,
+    onSeek,
+    isActive,
+    isMatch,
+    isActiveMatch,
+    highlight,
     isStreaming,
     showConfidence,
 }: {
@@ -217,19 +232,69 @@ const TranscriptSegment = memo(function TranscriptSegment({
     speakerOptions?: Array<{ speaker_id: string; display_name: string }>;
     onSpeakerChange?: (transcriptId: string, speakerId: string) => void;
     onRenameSpeaker?: (speakerId: string, displayName: string) => void;
+    onSeek?: (seconds: number) => void;
+    isActive?: boolean;
+    isMatch?: boolean;
+    isActiveMatch?: boolean;
+    highlight?: string;
     isStreaming: boolean;
     showConfidence: boolean;
 }) {
     const displayText = cleanStopWords(text) || (text.trim() === '' ? '[Silence]' : text);
 
+    const highlightClass = isActiveMatch
+        ? 'bg-amber-400/25 ring-1 ring-amber-400/60'
+        : isMatch
+            ? 'bg-amber-400/10'
+            : isActive
+                ? 'bg-surface-2'
+                : '';
+
+    const renderText = (value: string) => {
+        if (!highlight) return value;
+        const lower = value.toLowerCase();
+        const needle = highlight.toLowerCase();
+        const nodes: ReactNode[] = [];
+        let cursor = 0;
+        while (cursor <= value.length) {
+            const found = lower.indexOf(needle, cursor);
+            if (found === -1) {
+                nodes.push(value.slice(cursor));
+                break;
+            }
+            if (found > cursor) nodes.push(value.slice(cursor, found));
+            nodes.push(
+                <mark key={`${found}-${cursor}`} className="rounded bg-amber-300/60 px-0.5 text-inherit">
+                    {value.slice(found, found + needle.length)}
+                </mark>,
+            );
+            cursor = found + Math.max(needle.length, 1);
+        }
+        return nodes;
+    };
+
     return (
-        <div id={`segment-${id}`} className="mb-3">
+        <div
+            id={`segment-${id}`}
+            className={`mb-3 rounded-lg px-2 -mx-2 transition-colors ${highlightClass}`}
+        >
             <div className="flex items-start gap-2">
                 <Tooltip>
-                    <TooltipTrigger>
-                        <span className="text-xs text-ink-subtle mt-1 flex-shrink-0 min-w-[50px]">
-                            {formatRecordingTime(timestamp)}
-                        </span>
+                    <TooltipTrigger asChild>
+                        {onSeek ? (
+                            <button
+                                type="button"
+                                onClick={() => onSeek(timestamp)}
+                                title="Play from here"
+                                className="mt-1 min-w-[50px] flex-shrink-0 text-left text-xs text-ink-subtle hover:text-ink"
+                            >
+                                {formatRecordingTime(timestamp)}
+                            </button>
+                        ) : (
+                            <span className="mt-1 min-w-[50px] flex-shrink-0 text-xs text-ink-subtle">
+                                {formatRecordingTime(timestamp)}
+                            </span>
+                        )}
                     </TooltipTrigger>
                     <TooltipContent>
                         {confidence !== undefined && showConfidence && (
@@ -250,10 +315,10 @@ const TranscriptSegment = memo(function TranscriptSegment({
                     )}
                     {isStreaming ? (
                         <div className="bg-surface-2 border border-hairline rounded-lg px-3 py-2">
-                            <p className="text-base text-ink leading-relaxed">{displayText}</p>
+                            <p className="text-base text-ink leading-relaxed">{renderText(displayText)}</p>
                         </div>
                     ) : (
-                        <p className="text-base text-ink leading-relaxed">{displayText}</p>
+                        <p className="text-base text-ink leading-relaxed">{renderText(displayText)}</p>
                     )}
                 </div>
             </div>
@@ -278,6 +343,11 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
     speakerOptions,
     onSpeakerChange,
     onRenameSpeaker,
+    onSeek,
+    activeSegmentId,
+    matchIds,
+    activeMatchId,
+    highlightQuery,
 }) => {
     // Create scroll ref first - shared between virtualizer and auto-scroll hook
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -473,6 +543,11 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         speakerOptions={speakerOptions}
                                         onSpeakerChange={onSpeakerChange}
                                         onRenameSpeaker={onRenameSpeaker}
+                                        onSeek={onSeek}
+                                        isActive={segment.id === activeSegmentId}
+                                        isMatch={matchIds?.has(segment.id) ?? false}
+                                        isActiveMatch={segment.id === activeMatchId}
+                                        highlight={highlightQuery}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
                                     />
@@ -534,6 +609,11 @@ export const VirtualizedTranscriptView: React.FC<VirtualizedTranscriptViewProps>
                                         speakerOptions={speakerOptions}
                                         onSpeakerChange={onSpeakerChange}
                                         onRenameSpeaker={onRenameSpeaker}
+                                        onSeek={onSeek}
+                                        isActive={segment.id === activeSegmentId}
+                                        isMatch={matchIds?.has(segment.id) ?? false}
+                                        isActiveMatch={segment.id === activeMatchId}
+                                        highlight={highlightQuery}
                                         isStreaming={isStreaming}
                                         showConfidence={showConfidence}
                                     />

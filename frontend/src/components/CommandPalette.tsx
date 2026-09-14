@@ -6,11 +6,13 @@ import {
   FileText,
   Home,
   Import,
+  Link2,
   Mic,
   Search,
   Settings,
   SunMoon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   CommandDialog,
   CommandEmpty,
@@ -103,6 +105,22 @@ export function CommandPalette() {
           <CommandItem onSelect={() => runCommand(toggleTheme)}>
             <SunMoon />
             Toggle theme
+          </CommandItem>
+          <CommandItem
+            onSelect={() =>
+              runCommand(() => {
+                const meetingId = new URLSearchParams(window.location.search).get('id');
+                if (!meetingId) {
+                  toast.error('Open a meeting first');
+                  return;
+                }
+                void navigator.clipboard.writeText(`minutes://meeting/${meetingId}`);
+                toast.success('Meeting link copied');
+              })
+            }
+          >
+            <Link2 />
+            Copy meeting link
           </CommandItem>
         </CommandGroup>
 

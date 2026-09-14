@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Copy, FolderOpen, MoreHorizontal, RefreshCw, UserRoundCog, Users } from 'lucide-react';
+import { Copy, FolderOpen, Link2, MoreHorizontal, RefreshCw, UserRoundCog, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import Analytics from '@/lib/analytics';
 import { RetranscribeDialog } from './RetranscribeDialog';
@@ -148,6 +148,16 @@ export function TranscriptButtonGroup({
             {meetingId && transcriptCount > 0 && onOpenSpeakerManager && (
               <DropdownMenuItem onClick={onOpenSpeakerManager}>
                 <UserRoundCog className="mr-2 h-4 w-4" /> Manage speaker names
+              </DropdownMenuItem>
+            )}
+            {meetingId && (
+              <DropdownMenuItem
+                onClick={() => {
+                  void navigator.clipboard.writeText(`minutes://meeting/${meetingId}`);
+                  toast.success('Meeting link copied');
+                }}
+              >
+                <Link2 className="mr-2 h-4 w-4" /> Copy meeting link
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
