@@ -146,6 +146,43 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Stable file names so README links like
+      # /releases/latest/download/minutes-macos-arm64.dmg never go stale.
+      - name: Add stable-named download aliases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.create-release.outputs.version }}"
+          REPO="${{ github.repository }}"
+          workdir="$(mktemp -d)"
+
+          gh release download "v${VERSION}" -R "$REPO" -D "$workdir" \
+            -p "*_aarch64.dmg" -p "*_x64-setup.exe" -p "*_x64_*-US.msi" || true
+
+          upload=()
+          dmg="$(ls "$workdir"/*_aarch64.dmg 2>/dev/null | head -1 || true)"
+          if [ -n "$dmg" ]; then
+            cp "$dmg" "$workdir/minutes-macos-arm64.dmg"
+            upload+=("$workdir/minutes-macos-arm64.dmg")
+          fi
+          exe="$(ls "$workdir"/*_x64-setup.exe 2>/dev/null | head -1 || true)"
+          if [ -n "$exe" ]; then
+            cp "$exe" "$workdir/minutes-windows-x64-setup.exe"
+            upload+=("$workdir/minutes-windows-x64-setup.exe")
+          fi
+          msi="$(ls "$workdir"/*_x64_*-US.msi 2>/dev/null | head -1 || true)"
+          if [ -n "$msi" ]; then
+            cp "$msi" "$workdir/minutes-windows-x64.msi"
+            upload+=("$workdir/minutes-windows-x64.msi")
+          fi
+
+          if [ ${#upload[@]} -gt 0 ]; then
+            gh release upload "v${VERSION}" "${upload[@]}" -R "$REPO" --clobber
+          else
+            echo "No bundles found to alias"
+          fi
+
       - name: Get release assets and latest.json
         id: release-info
         run: |

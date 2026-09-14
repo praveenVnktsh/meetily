@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/praveenvnktsh/minutes/releases/latest"><img src="https://img.shields.io/github/v/release/praveenvnktsh/minutes?style=for-the-badge&label=download&color=2ea043" alt="Download the latest release" /></a>
   <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-000000?style=for-the-badge" alt="Platforms" />
   <img src="https://img.shields.io/badge/stack-Tauri%202%20%C2%B7%20Rust%20%C2%B7%20Next.js-000000?style=for-the-badge" alt="Stack" />
   <img src="https://img.shields.io/badge/100%25%20local-%26%20private-2ea043?style=for-the-badge" alt="Local-first" />
@@ -75,15 +76,19 @@
 - Full-text transcript search and a meetings list with dates.
 - Signed desktop updates.
 
-## Install
+## Download
 
-Prebuilt packages are on the [Releases page](https://github.com/praveenvnktsh/minutes/releases/latest).
+Click to download the latest version directly:
 
-| Platform | Notes |
+| Platform | Download |
 | --- | --- |
-| **macOS** | Apple Silicon (`minutes.app`) |
-| **Windows** | x64 with AVX2; Vulkan for Whisper acceleration |
-| **Linux** | Supported via source builds |
+| **macOS** (Apple Silicon) | [**minutes-macos-arm64.dmg**](https://github.com/praveenvnktsh/minutes/releases/latest/download/minutes-macos-arm64.dmg) |
+| **Windows** (x64) | [**minutes-windows-x64-setup.exe**](https://github.com/praveenvnktsh/minutes/releases/latest/download/minutes-windows-x64-setup.exe) · [.msi](https://github.com/praveenvnktsh/minutes/releases/latest/download/minutes-windows-x64.msi) |
+
+All releases and notes: [github.com/praveenvnktsh/minutes/releases/latest](https://github.com/praveenvnktsh/minutes/releases/latest).
+Linux is supported via source builds (see below).
+
+> **macOS first launch:** Minutes isn't notarized yet, so macOS may warn that it "could not verify it is free of malware". To open it, **right-click the app → Open → Open**, or run `xattr -dr com.apple.quarantine /Applications/minutes.app` once.
 
 ## Quick start
 
