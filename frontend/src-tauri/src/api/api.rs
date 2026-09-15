@@ -36,6 +36,8 @@ pub struct Meeting {
     pub pinned: bool,
     #[serde(default)]
     pub archived: bool,
+    #[serde(default)]
+    pub debug: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -356,6 +358,7 @@ pub async fn api_get_meetings<R: Runtime>(
                     created_at: Some(m.created_at.0.to_rfc3339()),
                     pinned: m.pinned,
                     archived: m.archived,
+                    debug: m.is_debug,
                 })
                 .collect();
             Ok(result)
@@ -1087,14 +1090,17 @@ pub async fn api_create_meeting<R: Runtime>(
     state: tauri::State<'_, AppState>,
     meeting_title: String,
     folder_path: Option<String>,
+    debug: Option<bool>,
 ) -> Result<serde_json::Value, String> {
+    let is_debug = debug.unwrap_or(false);
     log_info!(
-        "api_create_meeting called for meeting: {}, folder_path: {:?}",
+        "api_create_meeting called for meeting: {}, folder_path: {:?}, debug: {}",
         meeting_title,
-        folder_path
+        folder_path,
+        is_debug
     );
     let pool = state.db_manager.pool();
-    match MeetingsRepository::create_meeting(pool, &meeting_title, folder_path).await {
+    match MeetingsRepository::create_meeting(pool, &meeting_title, folder_path, is_debug).await {
         Ok(meeting_id) => Ok(serde_json::json!({
             "status": "success",
             "meeting_id": meeting_id

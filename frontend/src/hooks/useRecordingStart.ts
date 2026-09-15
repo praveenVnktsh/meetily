@@ -19,6 +19,7 @@ import {
   isLiveTranscriptionEnabled,
   LIVE_TRANSCRIPTION_STORAGE_KEY,
 } from '@/lib/liveTranscription';
+import { cachedDebugMode } from '@/lib/debugMode';
 
 const TRANSCRIPTION_RUNTIME_START_ERROR_CODE = 'TRANSCRIPTION_RUNTIME_INITIALIZATION_FAILED';
 const TRANSCRIPTION_RUNTIME_USER_MESSAGE = 'Speech recognition could not initialize. Restart Minutes. If the problem continues, repair or reinstall the app.';
@@ -142,7 +143,11 @@ export function useRecordingStart(
     }
 
     try {
-      const { meeting_id } = await storageService.createMeeting(title, folderPath);
+      const { meeting_id } = await storageService.createMeeting(
+        title,
+        folderPath,
+        cachedDebugMode(),
+      );
       if (!meeting_id) return;
       sessionStorage.setItem('active_recording_meeting_id', meeting_id);
       setCurrentMeeting({ id: meeting_id, title });

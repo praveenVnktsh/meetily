@@ -40,7 +40,14 @@ pub fn create_meeting_folder(
     let timestamp = Utc::now().format("%Y-%m-%d_%H-%M").to_string();
     let sanitized_name = sanitize_filename(meeting_name);
     let folder_name = format!("{}_{}", sanitized_name, timestamp);
-    let meeting_folder = base_path.join(folder_name);
+
+    // Keep debug recordings out of the real recordings folder.
+    let base = if crate::debug_mode::is_enabled() {
+        base_path.join("debug")
+    } else {
+        base_path.clone()
+    };
+    let meeting_folder = base.join(folder_name);
 
     // Create main meeting folder
     std::fs::create_dir_all(&meeting_folder)?;

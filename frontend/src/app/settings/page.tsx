@@ -11,6 +11,7 @@ import { PreferenceSettings } from '@/components/PreferenceSettings';
 import { SummaryModelSettings } from '@/components/SummaryModelSettings';
 import { BetaSettings } from '@/components/BetaSettings';
 import { WebhookSettings } from '@/components/WebhookSettings';
+import { DebugSettings } from '@/components/DebugSettings';
 import { useConfig } from '@/contexts/ConfigContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -131,6 +132,9 @@ export default function SettingsPage() {
             </TabsContent>
             <TabsContent value="beta" className="mt-6">
               <BetaSettings />
+              <div className="mt-6">
+                <DebugSettings />
+              </div>
             </TabsContent>
           </Tabs>
         </div>

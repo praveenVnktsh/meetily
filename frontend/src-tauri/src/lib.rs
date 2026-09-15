@@ -41,6 +41,7 @@ pub mod api;
 pub mod audio;
 pub mod config;
 pub mod console_utils;
+pub mod debug_mode;
 pub mod database;
 pub mod notifications;
 pub mod ollama;
@@ -576,6 +577,9 @@ pub fn run() {
                 });
             }
 
+            // Restore debug mode before anything else uses it.
+            debug_mode::load(_app.handle());
+
             // Load the custom transcription vocabulary into the Whisper engine.
             if let Ok(store) = _app.store("store.json") {
                 if let Some(value) = store.get("transcriptionVocabulary") {
@@ -693,6 +697,10 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             tray::set_meeting_detected_tray,
+            debug_mode::get_debug_mode,
+            debug_mode::set_debug_mode,
+            debug_mode::get_debug_info,
+            debug_mode::delete_debug_meetings,
             meeting_prompt::dismiss_meeting_prompt,
             meeting_prompt::start_recording_from_prompt,
             start_recording,

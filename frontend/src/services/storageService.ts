@@ -63,11 +63,13 @@ export class StorageService {
    */
   async createMeeting(
     meetingTitle: string,
-    folderPath: string | null
+    folderPath: string | null,
+    debug = false
   ): Promise<CreateMeetingResponse> {
     return invoke<CreateMeetingResponse>('api_create_meeting', {
       meetingTitle,
       folderPath,
+      debug,
     });
   }
 

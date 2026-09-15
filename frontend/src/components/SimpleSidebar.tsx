@@ -6,6 +6,7 @@ import {
   Archive,
   ArchiveRestore,
   AudioLines,
+  Bug,
   Home,
   Mic,
   Moon,
@@ -23,6 +24,8 @@ import {
 import { invoke } from '@tauri-apps/api/core';
 import { useSidebar, type CurrentMeeting } from '@/components/Sidebar/SidebarProvider';
 import { useRecordingState } from '@/contexts/RecordingStateContext';
+import { useDebugMode } from '@/hooks/useDebugMode';
+import { setDebugMode } from '@/lib/debugMode';
 import { useShell } from '@/contexts/ShellContext';
 import { useImportDialog } from '@/contexts/ImportDialogContext';
 import { useConfig } from '@/contexts/ConfigContext';
@@ -56,6 +59,7 @@ export default function SimpleSidebar() {
     refetchMeetings,
   } = useSidebar();
   const { isRecording } = useRecordingState();
+  const debugMode = useDebugMode();
   const { openImportDialog } = useImportDialog();
   const { betaFeatures } = useConfig();
   const [query, setQuery] = useState('');
@@ -77,11 +81,19 @@ export default function SimpleSidebar() {
     return () => window.removeEventListener('focus-sidebar-search', onFocusSearch);
   }, [collapsed, toggleCollapsed]);
 
+  // Debug recordings are hidden unless debug mode is on.
+  const scopedMeetings = useMemo(
+    () => (debugMode ? meetings : meetings.filter((meeting) => !meeting.debug)),
+    [meetings, debugMode],
+  );
+
   const visibleMeetings = useMemo(() => {
-    if (!query.trim()) return meetings;
-    const byId = new Map(meetings.map((meeting) => [meeting.id, meeting]));
-    return searchResults.map((result) => byId.get(result.id) ?? { id: result.id, title: result.title, created_at: undefined });
-  }, [meetings, query, searchResults]);
+    if (!query.trim()) return scopedMeetings;
+    const byId = new Map(scopedMeetings.map((meeting) => [meeting.id, meeting]));
+    return searchResults
+      .map((result) => byId.get(result.id) ?? { id: result.id, title: result.title, created_at: undefined })
+      .filter((meeting) => debugMode || !meeting.debug);
+  }, [scopedMeetings, debugMode, query, searchResults]);
 
   const openMeeting = (meeting: { id: string; title: string; created_at?: string }) => {
     setCurrentMeeting(meeting);
@@ -112,7 +124,7 @@ export default function SimpleSidebar() {
   const pinnedMeetings = searching ? [] : visibleMeetings.filter((meeting) => meeting.pinned && !meeting.archived);
   const regularMeetings = searching ? visibleMeetings : visibleMeetings.filter((meeting) => !meeting.pinned && !meeting.archived);
   const archivedMeetings = searching ? [] : visibleMeetings.filter((meeting) => meeting.archived);
-  const archivedCount = meetings.filter((meeting) => meeting.archived).length;
+  const archivedCount = scopedMeetings.filter((meeting) => meeting.archived).length;
 
   const renderMeetingRow = (meeting: CurrentMeeting) => {
     const active = Boolean(pathname?.includes('/meeting-details')) && currentMeeting?.id === meeting.id;
@@ -132,8 +144,13 @@ export default function SimpleSidebar() {
             <Video className="h-4 w-4" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className={`block truncate text-[13px] leading-5 ${active ? 'font-medium text-ink' : 'text-ink-muted'}`}>
-              {meeting.title}
+            <span className={`flex items-center gap-1.5 text-[13px] leading-5 ${active ? 'font-medium text-ink' : 'text-ink-muted'}`}>
+              <span className="truncate">{meeting.title}</span>
+              {meeting.debug && (
+                <span className="shrink-0 rounded bg-amber-400/20 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-amber-600">
+                  debug
+                </span>
+              )}
             </span>
             <span className="mt-0.5 block truncate text-[11px] text-ink-subtle">
               {formatMeetingDate(meeting.created_at)}
@@ -354,6 +371,17 @@ export default function SimpleSidebar() {
 
       {/* Footer */}
       <div className={collapsed ? 'flex flex-col items-center gap-2 border-t border-hairline pt-3' : 'flex items-center gap-2 border-t border-hairline px-1 pt-3'}>
+        {debugMode && (
+          <button
+            type="button"
+            onClick={() => void setDebugMode(false)}
+            title="Debug mode is on — click to turn it off"
+            className={`rounded-lg p-2 text-amber-500 hover:bg-amber-500/10 ${collapsed ? '' : 'flex items-center gap-1.5'}`}
+          >
+            <Bug className="h-4 w-4" />
+            {!collapsed && <span className="text-xs font-medium">Debug on</span>}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => router.push('/settings')}

@@ -13,6 +13,8 @@ pub struct MeetingModel {
     pub pinned: bool,
     #[sqlx(default)]
     pub archived: bool,
+    #[sqlx(default)]
+    pub is_debug: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::Type)]

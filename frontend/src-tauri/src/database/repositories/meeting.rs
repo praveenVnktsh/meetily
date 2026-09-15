@@ -14,23 +14,36 @@ impl MeetingsRepository {
         pool: &SqlitePool,
         title: &str,
         folder_path: Option<String>,
+        is_debug: bool,
     ) -> Result<String, SqlxError> {
         let meeting_id = format!("meeting-{}", Uuid::new_v4());
         let now = Utc::now();
 
         sqlx::query(
-            "INSERT INTO meetings (id, title, created_at, updated_at, folder_path) VALUES (?, ?, ?, ?, ?)",
+            "INSERT INTO meetings (id, title, created_at, updated_at, folder_path, is_debug) VALUES (?, ?, ?, ?, ?, ?)",
         )
         .bind(&meeting_id)
         .bind(title)
         .bind(now)
         .bind(now)
         .bind(&folder_path)
+        .bind(is_debug as i64)
         .execute(pool)
         .await?;
 
-        info!("Created empty meeting {} ('{}')", meeting_id, title);
+        info!(
+            "Created empty meeting {} ('{}', debug={})",
+            meeting_id, title, is_debug
+        );
         Ok(meeting_id)
+    }
+
+    /// Delete every meeting flagged as debug. Cascades to transcripts/summaries.
+    pub async fn delete_debug_meetings(pool: &SqlitePool) -> Result<u64, SqlxError> {
+        let result = sqlx::query("DELETE FROM meetings WHERE is_debug = 1")
+            .execute(pool)
+            .await?;
+        Ok(result.rows_affected())
     }
 
     pub async fn get_meetings(pool: &SqlitePool) -> Result<Vec<MeetingModel>, sqlx::Error> {
