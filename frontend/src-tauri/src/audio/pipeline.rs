@@ -32,6 +32,10 @@ use super::vad::{ContinuousVadProcessor};
 /// during continuous speech is tracked separately in #756.
 const VAD_REDEMPTION_TIME_MS: u32 = 500;
 
+/// Force-emit a live speech segment once it reaches this length so long
+/// monologues don't wait for a pause. Kept below Whisper's 30s window.
+const LIVE_MAX_SEGMENT_MS: u64 = 15_000;
+
 /// Ring buffer for synchronized audio mixing
 /// Accumulates samples from mic and system streams until we have aligned windows
 struct AudioMixerRingBuffer {
@@ -765,10 +769,12 @@ impl AudioPipeline {
         // are tracked in #756.
         // Keep the two capture sources separate until after VAD. Mixing before
         // transcription loses the only deterministic speaker boundary we have.
-        let mic_vad_processor =
+        let mut mic_vad_processor =
             ContinuousVadProcessor::new(sample_rate, VAD_REDEMPTION_TIME_MS)?;
-        let system_vad_processor =
+        let mut system_vad_processor =
             ContinuousVadProcessor::new(sample_rate, VAD_REDEMPTION_TIME_MS)?;
+        mic_vad_processor.set_max_segment_ms(LIVE_MAX_SEGMENT_MS);
+        system_vad_processor.set_max_segment_ms(LIVE_MAX_SEGMENT_MS);
         info!(
             "VAD-driven pipeline: segments dispatched per speech burst (redemption_time={}ms)",
             VAD_REDEMPTION_TIME_MS

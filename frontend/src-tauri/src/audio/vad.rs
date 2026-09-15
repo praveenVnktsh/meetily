@@ -28,6 +28,8 @@ pub struct ContinuousVadProcessor {
     in_speech: bool,
     processed_samples: usize,
     speech_start_sample: usize,
+    // Force-emit a segment once it reaches this length (0 = disabled).
+    max_segment_ms: u64,
     // State tracking for smart logging
     last_logged_state: bool,
 }
@@ -82,9 +84,18 @@ impl ContinuousVadProcessor {
             in_speech: false,
             processed_samples: 0,
             speech_start_sample: 0,
+            max_segment_ms: 0,
             // Initialize state tracking
             last_logged_state: false,
         })
+    }
+
+    /// Force-emit the current speech once it reaches `ms` (0 disables).
+    ///
+    /// Bounds live latency for continuous speech that never pauses: the VAD only
+    /// ends a segment on silence otherwise, so a monologue could wait a long time.
+    pub fn set_max_segment_ms(&mut self, ms: u64) {
+        self.max_segment_ms = ms;
     }
 
     /// Process incoming audio samples and return any complete speech segments
@@ -111,7 +122,44 @@ impl ContinuousVadProcessor {
             }
         }
 
+        // Bound latency: emit long uninterrupted speech without waiting for a pause.
+        self.force_flush_if_due(&mut completed_segments);
+
         Ok(completed_segments)
+    }
+
+    /// Emit the buffered speech if it has reached the max segment duration, then
+    /// restart the VAD so the remaining audio forms a fresh segment (no duplicates).
+    fn force_flush_if_due(&mut self, out: &mut Vec<SpeechSegment>) {
+        if self.max_segment_ms == 0 || !self.in_speech || self.current_speech.is_empty() {
+            return;
+        }
+
+        let duration_ms = self.current_speech.len() as f64 / VAD_SAMPLE_RATE as f64 * 1000.0;
+        if duration_ms < self.max_segment_ms as f64 {
+            return;
+        }
+
+        let start_ms = self.speech_start_sample as f64 / VAD_SAMPLE_RATE as f64 * 1000.0;
+        let samples = std::mem::take(&mut self.current_speech);
+        let end_ms = start_ms + samples.len() as f64 / VAD_SAMPLE_RATE as f64 * 1000.0;
+
+        info!(
+            "VAD: max segment reached ({:.0}ms) — flushing mid-speech to bound latency",
+            duration_ms
+        );
+        out.push(SpeechSegment {
+            samples,
+            start_timestamp_ms: start_ms,
+            end_timestamp_ms: end_ms,
+            confidence: 0.75,
+        });
+
+        self.session.reset();
+        self.in_speech = false;
+        self.last_logged_state = false;
+        self.current_speech = Vec::new();
+        self.speech_start_sample = self.processed_samples;
     }
 
     /// Improved resampling from input sample rate to 16kHz with anti-aliasing
