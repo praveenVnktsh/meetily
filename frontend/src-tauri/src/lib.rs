@@ -39,6 +39,7 @@ pub const APP_NAME: &str = "Minutes";
 pub mod analytics;
 pub mod api;
 pub mod audio;
+pub mod calendar;
 pub mod config;
 pub mod console_utils;
 pub mod debug_mode;
@@ -671,6 +672,9 @@ pub fn run() {
             // Deliver durable transcription-complete webhooks in the background.
             webhooks::init_worker(&_app.handle());
 
+            // Poll the subscribed calendar feed and raise meeting reminders.
+            calendar::init_worker(&_app.handle());
+
             // Initialize bundled templates directory for dynamic template discovery
             log::info!("Initializing bundled templates directory...");
             if let Ok(resource_path) = _app.handle().path().resource_dir() {
@@ -957,6 +961,12 @@ pub fn run() {
             webhooks::get_webhook_config,
             webhooks::set_webhook_config,
             webhooks::test_webhook,
+            // Calendar subscription (ICS/iCal) integration
+            calendar::get_calendar_config,
+            calendar::set_calendar_config,
+            calendar::test_calendar_feed,
+            calendar::refresh_calendar_now,
+            calendar::get_calendar_events,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
