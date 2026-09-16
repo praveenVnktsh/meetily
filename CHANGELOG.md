@@ -7,6 +7,13 @@ Each GitHub release publishes the section below that matches its version.
 
 ## [Unreleased]
 
+## [1.5.2] - 2026-09-16
+
+### Changed
+
+- **Sharper local speaker diarization** (macOS) — switches to fp32 segmentation and a stronger VoxCeleb ResNet34 speaker embedding in place of the previous int8 segmentation and NeMo titanet-small embedding, for better speaker separation.
+- Clustering sensitivity can now be tuned with the `MEETILY_DIARIZATION_THRESHOLD` environment variable.
+
 ## [1.5.1] - 2026-09-16
 
 ### Added

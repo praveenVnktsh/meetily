@@ -13,10 +13,28 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use uuid::Uuid;
 
 const ENGINE: &str = "sherpa-onnx-1.13.8";
-const SEGMENTATION_MODEL: &str = "pyannote-segmentation-3.0-int8";
-const EMBEDDING_MODEL: &str = "nemo-titanet-small";
+const SEGMENTATION_MODEL: &str = "pyannote-segmentation-3.0";
+const EMBEDDING_MODEL: &str = "wespeaker-en-voxceleb-resnet34-lm";
+const SEGMENTATION_DIR: &str = "sherpa-onnx-pyannote-segmentation-3-0";
+// fp32 segmentation detects speaker boundaries more accurately than the int8
+// build; the extra ~4 MB on disk is a worthwhile trade for a local app.
+const SEGMENTATION_FILE: &str = "model.onnx";
 const SEGMENTATION_ARCHIVE_URL: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2";
-const EMBEDDING_MODEL_URL: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx";
+// VoxCeleb ResNet34 with large-margin training. English-focused and a much
+// stronger speaker discriminator than NeMo titanet-small, at a smaller size.
+const EMBEDDING_FILE: &str = "wespeaker_en_voxceleb_resnet34_LM.onnx";
+const EMBEDDING_MODEL_URL: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_resnet34_LM.onnx";
+// Fast clustering merges speakers above this cosine threshold. Override at
+// runtime with MEETILY_DIARIZATION_THRESHOLD to tune without rebuilding.
+const DEFAULT_CLUSTER_THRESHOLD: f32 = 0.8;
+
+fn cluster_threshold() -> f32 {
+    std::env::var("MEETILY_DIARIZATION_THRESHOLD")
+        .ok()
+        .and_then(|value| value.parse::<f32>().ok())
+        .filter(|value| *value > 0.0 && *value <= 1.0)
+        .unwrap_or(DEFAULT_CLUSTER_THRESHOLD)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SpeakerTurn {
@@ -69,8 +87,8 @@ async fn ensure_models<R: Runtime>(app: &AppHandle<R>) -> Result<ModelPaths> {
         .join("diarization");
     tokio::fs::create_dir_all(&root).await?;
 
-    let segmentation_dir = root.join("sherpa-onnx-pyannote-segmentation-3-0");
-    let segmentation = segmentation_dir.join("model.int8.onnx");
+    let segmentation_dir = root.join(SEGMENTATION_DIR);
+    let segmentation = segmentation_dir.join(SEGMENTATION_FILE);
     if !segmentation.exists() {
         let archive_path = root.join("segmentation.tar.bz2");
         let _ = app.emit(
@@ -94,7 +112,7 @@ async fn ensure_models<R: Runtime>(app: &AppHandle<R>) -> Result<ModelPaths> {
         .map_err(|error| anyhow!("Model extraction task failed: {error}"))??;
     }
 
-    let embedding = root.join("nemo_en_titanet_small.onnx");
+    let embedding = root.join(EMBEDDING_FILE);
     if !embedding.exists() {
         let _ = app.emit(
             "diarization-progress",
@@ -150,7 +168,7 @@ fn diarize_samples(
         },
         clustering: FastClusteringConfig {
             num_clusters: num_speakers.map(|value| value as i32).unwrap_or(-1),
-            threshold: 0.8,
+            threshold: cluster_threshold(),
             compute_confidence: true,
         },
         ..Default::default()
