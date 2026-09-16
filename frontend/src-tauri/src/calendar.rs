@@ -19,6 +19,7 @@ use std::sync::{LazyLock, Mutex};
 use std::time::{Duration as StdDuration, Instant};
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
+use futures_util::StreamExt;
 use icalendar::{Calendar, Component, DatePerhapsTime, Event, EventLike, EventStatus};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
@@ -40,6 +41,10 @@ const MAX_OCCURRENCES_PER_SERIES: u16 = 512;
 const REMINDER_GRACE_SECONDS: i64 = 150;
 
 const WORKER_TICK_SECONDS: u64 = 60;
+
+/// Upper bound on a feed body. A runaway or hostile feed must not be able to
+/// exhaust memory; real calendars are well under this.
+const MAX_FEED_BYTES: usize = 16 * 1024 * 1024;
 
 const DEFAULT_REFRESH_MINUTES: u64 = 15;
 const DEFAULT_LOOKAHEAD_DAYS: u32 = 7;
@@ -157,8 +162,15 @@ pub fn normalize_feed_url(raw: &str) -> Result<String, String> {
     };
 
     let parsed = url::Url::parse(&rewritten).map_err(|_| "Calendar URL is not a valid URL".to_string())?;
+    let is_localhost = parsed.host_str().is_some_and(|host| {
+        host.eq_ignore_ascii_case("localhost") || host == "127.0.0.1" || host == "::1"
+    });
     match parsed.scheme() {
-        "http" | "https" => Ok(parsed.to_string()),
+        "https" => Ok(parsed.to_string()),
+        "http" if is_localhost => Ok(parsed.to_string()),
+        "http" => Err(
+            "Calendar URL must use HTTPS (plain HTTP is only allowed for localhost)".to_string(),
+        ),
         other => Err(format!("Unsupported calendar URL scheme: {other}")),
     }
 }
@@ -254,10 +266,24 @@ async fn fetch_feed(
         .and_then(|value| value.to_str().ok())
         .map(str::to_string);
 
-    let text = response
-        .text()
-        .await
-        .map_err(|error| format!("Could not read calendar response: {error}"))?;
+    if response
+        .content_length()
+        .is_some_and(|length| length > MAX_FEED_BYTES as u64)
+    {
+        return Err("Calendar feed is larger than the 16 MB limit".to_string());
+    }
+
+    // Read in chunks so a lying/absent Content-Length cannot bypass the cap.
+    let mut buffer: Vec<u8> = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|error| format!("Could not read calendar response: {error}"))?;
+        if buffer.len() + chunk.len() > MAX_FEED_BYTES {
+            return Err("Calendar feed is larger than the 16 MB limit".to_string());
+        }
+        buffer.extend_from_slice(&chunk);
+    }
+    let text = String::from_utf8_lossy(&buffer).into_owned();
 
     Ok(FetchOutcome::Body { text, etag: new_etag })
 }
@@ -759,6 +785,9 @@ END:VCALENDAR\r\n";
             "https://calendar.google.com/x/basic.ics"
         );
         assert!(normalize_feed_url("https://example.com/feed.ics").is_ok());
+        // Plain HTTP would send the bearer token in the clear.
+        assert!(normalize_feed_url("http://example.com/feed.ics").is_err());
+        assert!(normalize_feed_url("http://localhost:8080/feed.ics").is_ok());
         assert!(normalize_feed_url("ftp://example.com/feed.ics").is_err());
         assert!(normalize_feed_url("   ").is_err());
     }
