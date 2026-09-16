@@ -1,7 +1,7 @@
 {
     "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
     "productName": "minutes",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "identifier": "com.meetily.ai",
     "build": {
         "frontendDist": "../out",
@@ -24,8 +24,8 @@
                 "label": "meeting-prompt",
                 "title": "Meeting detected",
                 "url": "/meeting-prompt",
-                "width": 380,
-                "height": 196,
+                "width": 320,
+                "height": 68,
                 "resizable": false,
                 "fullscreen": false,
                 "decorations": false,

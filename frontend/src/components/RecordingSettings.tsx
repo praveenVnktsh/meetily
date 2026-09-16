@@ -13,6 +13,7 @@ export interface RecordingPreferences {
   auto_save: boolean;
   file_format: string;
   automatic_record_prompt: boolean;
+  min_meeting_duration_seconds: number;
   preferred_mic_device: string | null;
   preferred_system_device: string | null;
 }
@@ -27,6 +28,7 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
     auto_save: true,
     file_format: 'mp4',
     automatic_record_prompt: true,
+    min_meeting_duration_seconds: 10,
     preferred_mic_device: null,
     preferred_system_device: null
   });
@@ -93,6 +95,13 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
     await Analytics.track('automatic_record_prompt_toggled', {
       enabled: enabled.toString()
     });
+  };
+
+  const handleMinDurationChange = async (value: string) => {
+    const seconds = Math.max(0, Math.min(3600, Math.round(Number(value) || 0)));
+    const newPreferences = { ...preferences, min_meeting_duration_seconds: seconds };
+    setPreferences(newPreferences);
+    await savePreferences(newPreferences);
   };
 
   const handleDeviceChange = async (devices: SelectedDevices) => {
@@ -212,6 +221,26 @@ export function RecordingSettings({ onSave }: RecordingSettingsProps) {
           onCheckedChange={handleAutomaticPromptToggle}
           disabled={saving}
         />
+      </div>
+
+      <div className="flex items-center justify-between p-4 border rounded-lg">
+        <div className="flex-1 pr-4">
+          <div className="font-medium">Discard short recordings</div>
+          <div className="text-sm text-ink-muted">
+            Delete meetings shorter than this that have no transcript or notes (0 disables).
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={0}
+            max={3600}
+            value={preferences.min_meeting_duration_seconds}
+            onChange={(event) => void handleMinDurationChange(event.target.value)}
+            className="h-9 w-20 rounded-md border border-hairline bg-surface-2 px-2 text-sm text-ink"
+          />
+          <span className="text-sm text-ink-muted">seconds</span>
+        </div>
       </div>
 
       {/* Folder Location - Only shown when auto_save is enabled */}

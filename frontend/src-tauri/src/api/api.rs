@@ -434,6 +434,39 @@ pub async fn save_text_export<R: Runtime>(
     Ok(path.to_string_lossy().to_string())
 }
 
+/// Delete a meeting and its recording folder (used to discard short recordings).
+#[tauri::command]
+pub async fn api_discard_meeting<R: Runtime>(
+    _app: AppHandle<R>,
+    state: tauri::State<'_, AppState>,
+    meeting_id: String,
+) -> Result<(), String> {
+    let pool = state.db_manager.pool();
+
+    let folder: Option<String> =
+        sqlx::query_scalar::<_, Option<String>>("SELECT folder_path FROM meetings WHERE id = ?")
+            .bind(&meeting_id)
+            .fetch_optional(pool)
+            .await
+            .map_err(|e| e.to_string())?
+            .flatten();
+
+    MeetingsRepository::delete_meeting(pool, &meeting_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    if let Some(folder) = folder {
+        if let Err(error) = std::fs::remove_dir_all(&folder) {
+            log_warn!(
+                "Could not remove discarded meeting folder {}: {}",
+                folder,
+                error
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Resolve the playable audio file for a meeting (inside its recording folder).
 #[tauri::command]
 pub async fn api_get_meeting_audio_path<R: Runtime>(

@@ -18,6 +18,10 @@ pub struct RecordingPreferences {
     pub file_format: String,
     #[serde(default = "default_automatic_record_prompt")]
     pub automatic_record_prompt: bool,
+    /// Meetings shorter than this (and with no content) are discarded on stop.
+    /// 0 disables the cleanup.
+    #[serde(default = "default_min_meeting_duration_seconds")]
+    pub min_meeting_duration_seconds: u32,
     #[serde(default)]
     pub preferred_mic_device: Option<String>,
     #[serde(default)]
@@ -34,6 +38,7 @@ impl Default for RecordingPreferences {
             auto_save: true,
             file_format: "mp4".to_string(),
             automatic_record_prompt: true,
+            min_meeting_duration_seconds: default_min_meeting_duration_seconds(),
             preferred_mic_device: None,
             preferred_system_device: None,
             #[cfg(target_os = "macos")]
@@ -44,6 +49,10 @@ impl Default for RecordingPreferences {
 
 fn default_automatic_record_prompt() -> bool {
     true
+}
+
+fn default_min_meeting_duration_seconds() -> u32 {
+    10
 }
 
 /// Get the default recordings folder based on platform

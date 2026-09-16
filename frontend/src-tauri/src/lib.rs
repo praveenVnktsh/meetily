@@ -697,6 +697,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             tray::set_meeting_detected_tray,
+            shortcuts::get_global_shortcuts,
+            shortcuts::set_global_shortcuts,
             debug_mode::get_debug_mode,
             debug_mode::set_debug_mode,
             debug_mode::get_debug_info,
@@ -816,6 +818,7 @@ pub fn run() {
             api::api_set_meeting_pinned,
             api::api_set_meeting_archived,
             api::save_text_export,
+            api::api_discard_meeting,
             api::api_get_meeting_audio_path,
             api::api_get_transcription_vocabulary,
             api::api_set_transcription_vocabulary,

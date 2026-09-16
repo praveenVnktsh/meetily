@@ -307,7 +307,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   if (pathname === '/meeting-prompt') {
     return (
-      <html lang="en" className="bg-transparent">
+      <html lang="en" className="dark bg-transparent">
         <body className={`${sourceSans3.variable} bg-transparent font-sans antialiased`}>
           {children}
         </body>

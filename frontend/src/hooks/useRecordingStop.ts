@@ -143,6 +143,7 @@ export function useRecordingStop(
     setIsRecording(false);
     setIsRecordingDisabled(true);
     const stopStartTime = Date.now();
+    const recordingSeconds = recordingState.recordingDuration ?? 0;
     const deferTranscription = shouldDeferTranscription(
       localStorage.getItem(LIVE_TRANSCRIPTION_STORAGE_KEY),
       betaFeatures.liveTranscription,
@@ -310,6 +311,46 @@ export function useRecordingStop(
             } catch (error) {
               console.warn('Could not persist live notes to the meeting:', error);
             }
+          }
+
+          // Discard short, empty recordings so accidental taps don't clutter the list.
+          try {
+            const preferences = await invoke<{ min_meeting_duration_seconds?: number }>(
+              'get_recording_preferences',
+            );
+            const minSeconds = preferences?.min_meeting_duration_seconds ?? 10;
+            if (minSeconds > 0) {
+              const transcriptSeconds = freshTranscripts.reduce(
+                (max, t) => Math.max(max, t.audio_end_time ?? 0),
+                0,
+              );
+              const durationSeconds = Math.max(recordingSeconds, transcriptSeconds);
+              const notes = await invoke<{
+                rawMarkdown?: string;
+                notes?: Array<{ text: string }>;
+              } | null>('get_meeting_live_notes', { meetingId }).catch(() => null);
+              const hasNotes =
+                !!notes &&
+                (((notes.rawMarkdown ?? '').trim().length > 0) ||
+                  (notes.notes ?? []).some((note) => note.text.trim().length > 0));
+              const hasTranscript = freshTranscripts.some((t) => t.text.trim().length > 0);
+
+              if (durationSeconds < minSeconds && !hasNotes && !hasTranscript) {
+                await invoke('api_discard_meeting', { meetingId }).catch((error) =>
+                  console.warn('Could not discard short recording:', error),
+                );
+                localStorage.removeItem(LIVE_NOTES_FALLBACK_KEY);
+                localStorage.removeItem(LIVE_NOTES_FALLBACK_FOLDER_KEY);
+                await refetchMeetings();
+                setIsMeetingActive(false);
+                setIsRecordingDisabled(false);
+                setStatus(RecordingStatus.IDLE);
+                toast.info('Discarded a short empty recording');
+                return;
+              }
+            }
+          } catch (cleanupError) {
+            console.warn('Could not evaluate short-recording cleanup:', cleanupError);
           }
 
           localStorage.removeItem(LIVE_NOTES_FALLBACK_KEY);

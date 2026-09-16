@@ -162,7 +162,7 @@ impl MacOSSystemAudioDetector {
 
                         for addr in addresses {
                             if addr.selector == ca::PropSelector::DEVICE_IS_RUNNING_SOMEWHERE {
-                                if let Ok(device) = ca::System::default_output_device() {
+                                if let Ok(device) = ca::System::default_input_device() {
                                     if let Ok(is_running) = device.prop::<u32>(&DEVICE_IS_RUNNING_SOMEWHERE) {
                                         let system_audio_active = is_running != 0;
 
@@ -171,7 +171,7 @@ impl MacOSSystemAudioDetector {
                                                 if system_audio_active {
                                                     let cb = callback.clone();
                                                     std::thread::spawn(move || {
-                                                        let apps = list_system_audio_using_apps();
+                                                        let apps = list_microphone_using_apps();
                                                         tracing::info!("detect_system_audio_listener: {:?}", apps);
 
                                                         if let Ok(guard) = cb.lock() {
@@ -218,7 +218,7 @@ impl MacOSSystemAudioDetector {
                         let addresses = unsafe { std::slice::from_raw_parts(addresses, number_addresses as usize) };
 
                         for addr in addresses {
-                            if addr.selector == ca::PropSelector::HW_DEFAULT_OUTPUT_DEVICE {
+                            if addr.selector == ca::PropSelector::HW_DEFAULT_INPUT_DEVICE {
                                 if let Ok(mut device_guard) = current_device.lock() {
                                     if let Some(old_device) = device_guard.take() {
                                         let _ = old_device.remove_prop_listener(
@@ -228,7 +228,7 @@ impl MacOSSystemAudioDetector {
                                         );
                                     }
 
-                                    if let Ok(new_device) = ca::System::default_output_device() {
+                                    if let Ok(new_device) = ca::System::default_input_device() {
                                         let system_audio_active = if let Ok(is_running) = new_device.prop::<u32>(&DEVICE_IS_RUNNING_SOMEWHERE) {
                                             is_running != 0
                                         } else {
@@ -250,7 +250,7 @@ impl MacOSSystemAudioDetector {
                                                     if system_audio_active {
                                                         let cb = data.0.clone();
                                                         std::thread::spawn(move || {
-                                                            let apps = list_system_audio_using_apps();
+                                                            let apps = list_microphone_using_apps();
                                                             tracing::info!("detect_system_listener: {:?}", apps);
 
                                                             if let Ok(callback_guard) = cb.lock() {
@@ -285,7 +285,7 @@ impl MacOSSystemAudioDetector {
                     let system_listener_ptr = Box::into_raw(system_listener_data) as *mut ();
 
                     if let Err(e) = ca::System::OBJ.add_prop_listener(
-                        &ca::PropSelector::HW_DEFAULT_OUTPUT_DEVICE.global_addr(),
+                        &ca::PropSelector::HW_DEFAULT_INPUT_DEVICE.global_addr(),
                         system_listener,
                         system_listener_ptr,
                     ) {
@@ -294,7 +294,7 @@ impl MacOSSystemAudioDetector {
                         tracing::info!("adding_system_listener_success");
                     }
 
-                    if let Ok(device) = ca::System::default_output_device() {
+                    if let Ok(device) = ca::System::default_input_device() {
                         let system_audio_active = if let Ok(is_running) = device.prop::<u32>(&DEVICE_IS_RUNNING_SOMEWHERE) {
                             is_running != 0
                         } else {
@@ -347,7 +347,7 @@ impl MacOSSystemAudioDetector {
                                 break;
                             }
 
-                            let mut apps = list_system_audio_using_apps();
+                            let mut apps = list_microphone_using_apps();
                             apps.sort_unstable();
                             apps.dedup();
 
@@ -373,12 +373,14 @@ impl MacOSSystemAudioDetector {
 }
 
 #[cfg(target_os = "macos")]
-fn list_system_audio_using_apps() -> Vec<String> {
+/// Apps currently capturing the microphone. Mic capture is the signal that the
+/// user is actually in a call, unlike output audio (music, video, etc.).
+fn list_microphone_using_apps() -> Vec<String> {
     match ca::System::processes() {
         Ok(processes) => {
             let mut apps = Vec::new();
             for process in processes {
-                if process.is_running_output().unwrap_or(false) {
+                if process.is_running_input().unwrap_or(false) {
                     if let Ok(pid) = process.pid() {
                         if let Some(running_app) = cidre::ns::RunningApp::with_pid(pid) {
                             let name = running_app
@@ -391,7 +393,9 @@ fn list_system_audio_using_apps() -> Vec<String> {
                 }
             }
 
-            if browser_has_google_meet() {
+            // Browsers hide which tab is open, so probe for a Meet URL among the
+            // browsers that are actually capturing the mic.
+            if browser_capturing_mic_has_google_meet(&apps) {
                 apps.push("Google Meet".to_string());
             }
             apps
@@ -401,16 +405,13 @@ fn list_system_audio_using_apps() -> Vec<String> {
 }
 
 #[cfg(target_os = "macos")]
-fn browser_has_google_meet() -> bool {
-    const BROWSERS: [(&str, &str); 3] = [
-        ("com.google.Chrome", "Google Chrome"),
-        ("com.microsoft.edgemac", "Microsoft Edge"),
-        ("com.apple.Safari", "Safari"),
-    ];
+fn browser_capturing_mic_has_google_meet(capturing: &[String]) -> bool {
+    const BROWSERS: [&str; 3] = ["Google Chrome", "Microsoft Edge", "Safari"];
 
-    BROWSERS.iter().any(|(bundle_id, application_name)| {
-        let bundle_id = cidre::ns::String::with_str(bundle_id);
-        !cidre::ns::RunningApp::with_bundle_id(&bundle_id).is_empty()
+    BROWSERS.iter().any(|application_name| {
+        capturing
+            .iter()
+            .any(|app| app.eq_ignore_ascii_case(application_name))
             && browser_has_google_meet_tab(application_name)
     })
 }

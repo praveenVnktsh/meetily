@@ -2,10 +2,47 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Switch } from "./ui/switch"
-import { FolderOpen, Keyboard } from "lucide-react"
+import { FolderOpen, Keyboard, X } from "lucide-react"
 import { invoke } from "@tauri-apps/api/core"
+import { toast } from "sonner"
 import Analytics from "@/lib/analytics"
 import { useConfig, NotificationSettings } from "@/contexts/ConfigContext"
+import { usePlatform } from "@/hooks/usePlatform"
+
+const OS_MODIFIER_KEYS = /^(Meta|Control|Alt|Shift)/
+
+/** Build a global-hotkey string (e.g. "CmdOrCtrl+Shift+KeyR") from a key event. */
+function eventToShortcut(event: KeyboardEvent, isMac: boolean): string | null {
+  const primary = isMac ? event.metaKey : event.ctrlKey;
+  const secondary = isMac ? event.ctrlKey : event.metaKey;
+  const mods: string[] = [];
+  if (primary) mods.push("CmdOrCtrl");
+  else if (secondary) mods.push(isMac ? "Control" : "Super");
+  if (event.altKey) mods.push("Alt");
+  if (event.shiftKey) mods.push("Shift");
+
+  const code = event.code;
+  if (!code || OS_MODIFIER_KEYS.test(code)) return null; // modifier-only
+  if (mods.length === 0) return null; // require at least one modifier
+
+  return [...mods, code].join("+");
+}
+
+/** Render a stored shortcut as a friendly label. */
+function displayShortcut(value: string, isMac: boolean): string {
+  if (!value) return "Not set";
+  return value
+    .split("+")
+    .map((part) => {
+      if (part === "CmdOrCtrl") return isMac ? "⌘" : "Ctrl";
+      if (part === "Super") return isMac ? "⌘" : "Win";
+      if (part === "Control") return "Ctrl";
+      if (part === "Alt") return isMac ? "⌥" : "Alt";
+      if (part === "Shift") return isMac ? "⇧" : "Shift";
+      return part.replace(/^Key/, "").replace(/^Digit/, "");
+    })
+    .join(isMac ? "" : "+");
+}
 
 export function PreferenceSettings() {
   const {
@@ -20,6 +57,47 @@ export function PreferenceSettings() {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [previousNotificationsEnabled, setPreviousNotificationsEnabled] = useState<boolean | null>(null);
   const hasTrackedViewRef = useRef(false);
+  const platform = usePlatform();
+  const isMac = platform === 'macos';
+  const [shortcuts, setShortcuts] = useState<{ recording: string; window: string } | null>(null);
+  const [recordingKey, setRecordingKey] = useState<'recording' | 'window' | null>(null);
+
+  useEffect(() => {
+    invoke<{ recording: string; window: string }>('get_global_shortcuts')
+      .then(setShortcuts)
+      .catch((error) => console.warn('Could not load shortcuts:', error));
+  }, []);
+
+  useEffect(() => {
+    if (!recordingKey || !shortcuts) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.key === 'Escape') {
+        setRecordingKey(null);
+        return;
+      }
+      const value = eventToShortcut(event, isMac);
+      if (!value) return;
+      const next = { ...shortcuts, [recordingKey]: value };
+      setShortcuts(next);
+      setRecordingKey(null);
+      invoke('set_global_shortcuts', { recording: next.recording, window: next.window })
+        .then(() => toast.success('Shortcut updated'))
+        .catch((error) => toast.error(`Could not update shortcut: ${String(error)}`));
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [recordingKey, shortcuts, isMac]);
+
+  const clearShortcut = (which: 'recording' | 'window') => {
+    if (!shortcuts) return;
+    const next = { ...shortcuts, [which]: '' };
+    setShortcuts(next);
+    invoke('set_global_shortcuts', { recording: next.recording, window: next.window })
+      .then(() => toast.success('Shortcut disabled'))
+      .catch((error) => toast.error(`Could not update shortcut: ${String(error)}`));
+  };
 
   // Lazy load preferences on mount (only loads if not already cached)
   useEffect(() => {
@@ -165,21 +243,49 @@ export function PreferenceSettings() {
           <h3 className="text-lg font-semibold text-ink">Keyboard Shortcuts</h3>
         </div>
         <p className="text-sm text-ink-muted mb-4">
-          These global shortcuts work even while Minutes is in the background.
+          Global shortcuts work even while Minutes is in the background. Click one to record a new
+          combination (Esc to cancel).
         </p>
         <ul className="space-y-3">
-          {[
-            { label: 'Open command palette', keys: '⌘ / Ctrl + K' },
-            { label: 'Start or stop recording', keys: '⌘ / Ctrl + Shift + R' },
-            { label: 'Show or hide Minutes', keys: '⌘ / Ctrl + Shift + M' },
-          ].map((shortcut) => (
-            <li key={shortcut.label} className="flex items-center justify-between gap-4">
-              <span className="text-sm text-ink">{shortcut.label}</span>
-              <kbd className="rounded border border-hairline bg-surface-2 px-2 py-1 text-xs font-medium text-ink-muted">
-                {shortcut.keys}
-              </kbd>
+          {(
+            [
+              { key: 'recording', label: 'Start or stop recording' },
+              { key: 'window', label: 'Show or hide Minutes' },
+            ] as const
+          ).map(({ key, label }) => (
+            <li key={key} className="flex items-center justify-between gap-4">
+              <span className="text-sm text-ink">{label}</span>
+              <span className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRecordingKey(key)}
+                  className={`rounded border px-2 py-1 text-xs font-medium ${
+                    recordingKey === key
+                      ? 'border-blue-400 text-blue-500'
+                      : 'border-hairline bg-surface-2 text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  {recordingKey === key ? 'Press keys…' : displayShortcut(shortcuts?.[key] ?? '', isMac)}
+                </button>
+                {shortcuts?.[key] && (
+                  <button
+                    type="button"
+                    onClick={() => clearShortcut(key)}
+                    title="Disable this shortcut"
+                    className="rounded p-1 text-ink-subtle hover:bg-surface-2 hover:text-ink"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </span>
             </li>
           ))}
+          <li className="flex items-center justify-between gap-4">
+            <span className="text-sm text-ink">Open command palette</span>
+            <kbd className="rounded border border-hairline bg-surface-2 px-2 py-1 text-xs font-medium text-ink-muted">
+              ⌘ / Ctrl + K
+            </kbd>
+          </li>
         </ul>
       </div>
 

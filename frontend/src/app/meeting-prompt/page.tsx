@@ -8,9 +8,17 @@ import { Mic, Video, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function MeetingPromptPage() {
-  const [appName, setAppName] = useState('A meeting app');
+  const [appName, setAppName] = useState('');
 
   useEffect(() => {
+    // Match the app theme (default dark, like the main window).
+    try {
+      const stored = localStorage.getItem('meetily:theme');
+      document.documentElement.classList.toggle('dark', stored !== 'light');
+    } catch {
+      document.documentElement.classList.add('dark');
+    }
+
     const unlisten = listen<{ appName: string }>('meeting-prompt-show', (event) => {
       setAppName(event.payload.appName);
     });
@@ -37,45 +45,28 @@ export default function MeetingPromptPage() {
   };
 
   return (
-    <main
-      className="h-screen w-screen overflow-hidden rounded-2xl border border-hairline bg-surface-raised p-4 shadow-2xl"
-    >
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
-          <Video className="h-5 w-5" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <h1 className="text-sm font-semibold text-ink">Meeting detected</h1>
-              <p className="mt-1 text-xs leading-5 text-ink-muted">
-                {appName} appears to be active. Start recording?
-              </p>
-            </div>
-            <button
-              aria-label="Dismiss"
-              onClick={() => void dismiss()}
-              className="rounded-md p-1 text-ink-subtle hover:bg-surface-2 hover:text-ink"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+    <main className="flex h-screen w-screen items-center gap-3 rounded-2xl border border-hairline bg-surface-raised px-3 shadow-2xl">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-ink-muted">
+        <Video className="h-4 w-4" />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13px] font-medium text-ink">Meeting detected</p>
+        {appName && <p className="truncate text-[11px] text-ink-subtle">{appName}</p>}
       </div>
 
-      <p className="mt-3 rounded-lg bg-surface-2 px-3 py-2 text-[11px] text-ink-muted">
-        Recording starts only after confirmation. Remember to inform participants.
-      </p>
+      <Button size="sm" className="h-7 shrink-0 gap-1.5 px-3" onClick={() => void startRecording()}>
+        <Mic className="h-3 w-3" />
+        Start
+      </Button>
 
-      <div className="mt-3 flex justify-end gap-2">
-        <Button size="sm" variant="outline" onClick={() => void dismiss()}>
-          Not now
-        </Button>
-        <Button size="sm" onClick={() => void startRecording()} className="gap-2 bg-red-600 hover:bg-red-700">
-          <Mic className="h-3.5 w-3.5" />
-          Start recording
-        </Button>
-      </div>
+      <button
+        aria-label="Dismiss"
+        onClick={() => void dismiss()}
+        className="shrink-0 rounded-md p-1.5 text-ink-subtle hover:bg-surface-2 hover:text-ink"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
     </main>
   );
 }
