@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import Analytics from "@/lib/analytics"
 import { useConfig, NotificationSettings } from "@/contexts/ConfigContext"
 import { usePlatform } from "@/hooks/usePlatform"
+import { UpdateSettings } from "./UpdateSettings"
 
 const OS_MODIFIER_KEYS = /^(Meta|Control|Alt|Shift)/
 
@@ -349,6 +350,8 @@ export function PreferenceSettings() {
           </p>
         </div>
       </div>
+
+      <UpdateSettings />
     </div>
   )
 }
