@@ -43,6 +43,27 @@ on:
         required: false
         type: boolean
         default: false
+      # Overrides the version read from tauri.conf.json before building. Used by
+      # the canary workflow so every merged build gets a unique, newer version.
+      build-version:
+        required: false
+        type: string
+        default: ""
+      # Overrides the release tag used by tauri-action. Needed for the rolling
+      # `canary` release, whose tag does not follow the vX.Y.Z convention.
+      release-tag:
+        required: false
+        type: string
+        default: ""
+      release-name:
+        required: false
+        type: string
+        default: ""
+      # "true" keeps the target release marked as a prerelease (canary channel).
+      release-prerelease:
+        required: false
+        type: string
+        default: "false"
 
 jobs:
   build:
@@ -56,6 +77,16 @@ jobs:
           repository: ${{ inputs.repository }}
           ref: ${{ inputs.ref }}
           fetch-depth: 0
+
+      - name: Apply build version override
+        if: inputs.build-version != ''
+        shell: bash
+        run: |
+          VERSION="${{ inputs.build-version }}"
+          tmp="$(mktemp)"
+          jq --arg v "$VERSION" '.version = $v' frontend/src-tauri/tauri.conf.json > "$tmp"
+          mv "$tmp" frontend/src-tauri/tauri.conf.json
+          echo "Applied build version override: $VERSION"
 
       - name: Get version from tauri.conf.json.
         id: get-version
@@ -623,9 +654,10 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
-          releaseName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
+          tagName: ${{ inputs.release-id && (inputs.release-tag != '' && inputs.release-tag || format('v{0}', steps.get-version.outputs.version)) || '' }}
+          releaseName: ${{ inputs.release-id && (inputs.release-name != '' && inputs.release-name || format('v{0}', steps.get-version.outputs.version)) || '' }}
           releaseId: ${{ inputs.release-id }}
+          prerelease: ${{ inputs.release-prerelease }}
           args: ${{ inputs.build-args }} ${{ steps.build-features.outputs.features }} ${{ steps.windows-portability.outputs.args }}
 
       - name: Build with Tauri (updater signed only)
@@ -642,9 +674,10 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         with:
           projectPath: frontend
-          tagName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
-          releaseName: ${{ inputs.release-id && format('v{0}', steps.get-version.outputs.version) || '' }}
+          tagName: ${{ inputs.release-id && (inputs.release-tag != '' && inputs.release-tag || format('v{0}', steps.get-version.outputs.version)) || '' }}
+          releaseName: ${{ inputs.release-id && (inputs.release-name != '' && inputs.release-name || format('v{0}', steps.get-version.outputs.version)) || '' }}
           releaseId: ${{ inputs.release-id }}
+          prerelease: ${{ inputs.release-prerelease }}
           args: ${{ inputs.build-args }} ${{ steps.build-features.outputs.features }} ${{ steps.windows-portability.outputs.args }}
 
       - name: Upload artifacts (macOS)
