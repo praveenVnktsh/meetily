@@ -71,40 +71,80 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const tag = `v${{ steps.get-version.outputs.version }}`
+            const fs = require('fs');
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const version = '${{ steps.get-version.outputs.version }}';
+            const tag = `v${version}`;
+
+            // Publish this version's section from CHANGELOG.md as the release body.
+            let changelog = '';
+            try {
+              const lines = fs.readFileSync('CHANGELOG.md', 'utf8').split(/\r?\n/);
+              const start = lines.findIndex((line) => line.startsWith(`## [${version}]`));
+              if (start !== -1) {
+                const rest = lines.slice(start + 1);
+                const end = rest.findIndex((line) => line.startsWith('## ['));
+                changelog = (end === -1 ? rest : rest.slice(0, end)).join('\n').trim();
+              } else {
+                core.warning(`No CHANGELOG.md section found for ${version}`);
+              }
+            } catch (error) {
+              core.warning(`Could not read CHANGELOG.md: ${error}`);
+            }
+            const changelogLink = `See [CHANGELOG.md](https://github.com/${owner}/${repo}/blob/main/CHANGELOG.md).`;
+            const download = [
+              '## Download',
+              '',
+              '| Platform | File |',
+              '| --- | --- |',
+              `| **macOS** (Apple Silicon) | [minutes-macos-arm64.dmg](https://github.com/${owner}/${repo}/releases/download/${tag}/minutes-macos-arm64.dmg) |`,
+              `| **Windows** (x64) | [minutes-windows-x64-setup.exe](https://github.com/${owner}/${repo}/releases/download/${tag}/minutes-windows-x64-setup.exe) · [.msi](https://github.com/${owner}/${repo}/releases/download/${tag}/minutes-windows-x64.msi) |`,
+              '',
+              '> **macOS first launch:** Minutes is not notarized yet, so macOS may warn that it could not verify the app. Right-click the app → **Open**, or run `xattr -dr com.apple.quarantine /Applications/minutes.app` once.',
+              '',
+            ].join('\n');
+            const body = `${download}\n${changelog || changelogLink}\n`;
+
             const releases = await github.paginate(github.rest.repos.listReleases, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               per_page: 100
             })
             const existing = releases.find(release => release.draft && release.tag_name === tag)
 
             if (existing) {
               const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
-                owner: context.repo.owner,
-                repo: context.repo.repo,
+                owner,
+                repo,
                 release_id: existing.id,
                 per_page: 100
               })
               for (const asset of assets) {
                 await github.rest.repos.deleteReleaseAsset({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
+                  owner,
+                  repo,
                   asset_id: asset.id
                 })
               }
-              console.log(`Reusing draft release ${existing.id} and cleared ${assets.length} partial assets`)
+              await github.rest.repos.updateRelease({
+                owner,
+                repo,
+                release_id: existing.id,
+                body
+              })
+              console.log(`Reusing draft release ${existing.id}, refreshed body, cleared ${assets.length} partial assets`)
               return existing.id
             }
 
             const { data } = await github.rest.repos.createRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
+              owner,
+              repo,
               tag_name: tag,
-              name: `Minutes v${{ steps.get-version.outputs.version }}`,
+              name: `Minutes v${version}`,
               draft: true,
               prerelease: false,
-              generate_release_notes: true
+              body
             })
             console.log(`Created draft release with ID: ${data.id}`)
             return data.id
