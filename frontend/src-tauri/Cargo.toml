@@ -127,6 +127,12 @@ dirs = "5.0.1"
 # Additional dependencies for notification system
 url = "2.5.0"
 
+# Calendar subscription (ICS/iCal) integration
+# Pinned: 0.17.13 provides Calendar::calendar_events + CalendarEvent recurrence.
+icalendar = { version = "0.17.13", features = ["parser", "recurrence"] }
+rrule = "0.14"
+chrono-tz = "0.10"
+
 
 # System monitoring for resource management
 sysinfo = "0.32"
